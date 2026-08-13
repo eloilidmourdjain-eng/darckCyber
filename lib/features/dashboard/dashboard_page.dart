@@ -149,7 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SuperAdminPage()),
+                        MaterialPageRoute(builder: (context) => const SuperAdminToolsPage()),
                       );
                     },
                   ),
