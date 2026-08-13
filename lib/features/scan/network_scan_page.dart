@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 // Constantes de design issues du Dashboard
@@ -27,6 +26,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   double _sharedBandwidthLimitMbps = 150.0;
 
   bool _isScanning = false;
+  double _scanProgress = 0.0;
   String _pingResult = "Prêt à scanner le réseau local";
   int? _pingLatencyMs;
 
@@ -75,7 +75,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   ];
 
   final List<Map<String, dynamic>> _portsToScan = [
-    {"port": 21, "service": "FTP", "isOpen": false, "scanned": false},
+    {"port": 21, "service": "FTP", "isOpen": false, "scanned": true},
     {"port": 22, "service": "SSH", "isOpen": true, "scanned": true},
     {"port": 80, "service": "HTTP", "isOpen": true, "scanned": true},
     {"port": 443, "service": "HTTPS", "isOpen": true, "scanned": true},
@@ -96,39 +96,62 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
     super.dispose();
   }
 
-  // Simulation d'un scan réseau global et ping de la cible
+  // Simulation d'un scan réseau global et balayage asynchrone (Ping Sweep)
   Future<void> _runNetworkScan() async {
-    final String targetIp = _ipController.text.trim();
-    if (targetIp.isEmpty) return;
+    final String targetIpInput = _ipController.text.trim();
+    if (targetIpInput.isEmpty) return;
 
     setState(() {
       _isScanning = true;
-      _pingResult = "Analyse de la passerelle $targetIp...";
+      _scanProgress = 0.0;
+      _pingResult = "Balayage asynchrone du sous-réseau en cours...";
       _pingLatencyMs = null;
     });
 
-    final stopwatch = Stopwatch()..start();
-    try {
-      final socket = await Socket.connect(targetIp, 80, timeout: const Duration(seconds: 2))
-          .catchError((_) => Socket.connect(targetIp, 443, timeout: const Duration(seconds: 2)));
-      stopwatch.stop();
-      socket.destroy();
-      setState(() {
-        _pingLatencyMs = stopwatch.elapsedMilliseconds;
-        _pingResult = "Passerelle active et sécurisée (${_pingLatencyMs}ms)";
-      });
-    } catch (_) {
-      stopwatch.stop();
-      setState(() {
-        _pingLatencyMs = 3; // Simulation par défaut pour l'ergonomie locale
-        _pingResult = "Hôte joignable sur le sous-réseau local (3ms)";
-      });
+    String subnet = "192.168.1.";
+    if (targetIpInput.contains('.')) {
+      List<String> parts = targetIpInput.split('.');
+      if (parts.length >= 3) {
+        subnet = "${parts[0]}.${parts[1]}.${parts[2]}.";
+      }
     }
 
-    await Future.delayed(const Duration(seconds: 1));
+    int totalHostsToSweep = 20;
+    int activeCount = 0;
+
+    final stopwatch = Stopwatch()..start();
+
+    for (int i = 1; i <= totalHostsToSweep; i++) {
+      if (!mounted) break;
+
+      // Simulation asynchrone d'un test de présence réseau
+      await Future.delayed(const Duration(milliseconds: 120));
+
+      setState(() {
+        _scanProgress = i / totalHostsToSweep;
+      });
+
+      if (i == 1 || i == 4 || i == 10 || i == 15 || i == 19) {
+        activeCount++;
+      }
+    }
+
+    stopwatch.stop();
+
     setState(() {
       _isScanning = false;
+      _pingLatencyMs = stopwatch.elapsedMilliseconds ~/ totalHostsToSweep;
+      _pingResult = "Balayage terminé : $activeCount hôtes actifs découverts sur $subnet(0/24)";
     });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Scan réseau et cartographie asynchrone terminés avec succès."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   void _showDeviceDetailsModal(BuildContext parentContext, Map<String, dynamic> device) {
@@ -168,31 +191,28 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
             _buildDetailRow("Puissance du signal", device["signal"]),
             _buildDetailRow("Statut du pare-feu", device["isBlocked"] ? "BLOQUÉ (Hors réseau)" : "AUTORISÉ (Connecté)"),
             const Spacer(),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: device["isBlocked"] ? Colors.green : Colors.redAccent,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        device["isBlocked"] = !device["isBlocked"];
-                      });
-                      Navigator.pop(modalContext);
-                      ScaffoldMessenger.of(parentContext).showSnackBar(
-                        SnackBar(
-                          content: Text(device["isBlocked"] ? "Équipement bloqué du réseau avec succès." : "Accès réseau rétabli pour cet équipement."),
-                          backgroundColor: device["isBlocked"] ? Colors.redAccent : Colors.green,
-                        ),
-                      );
-                    },
-                    icon: Icon(device["isBlocked"] ? Icons.check_circle : Icons.block, size: 16),
-                    label: Text(device["isBlocked"] ? "Débloquer l'accès" : "Bloquer l'équipement"),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: device["isBlocked"] ? Colors.green : Colors.redAccent,
+                  foregroundColor: Colors.white,
                 ),
-              ],
+                onPressed: () {
+                  setState(() {
+                    device["isBlocked"] = !device["isBlocked"];
+                  });
+                  Navigator.pop(modalContext);
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    SnackBar(
+                      content: Text(device["isBlocked"] ? "Équipement bloqué du réseau avec succès." : "Accès réseau rétabli pour cet équipement."),
+                      backgroundColor: device["isBlocked"] ? Colors.redAccent : Colors.green,
+                    ),
+                  );
+                },
+                icon: Icon(device["isBlocked"] ? Icons.check_circle : Icons.block, size: 16),
+                label: Text(device["isBlocked"] ? "Débloquer l'accès" : "Bloquer l'équipement"),
+              ),
             ),
           ],
         ),
@@ -252,7 +272,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                       controller: _ipController,
                       style: const TextStyle(color: kTextMain, fontSize: 13),
                       decoration: InputDecoration(
-                        labelText: "Adresse IP / Gateway",
+                        labelText: "Adresse IP / Sous-réseau",
                         labelStyle: const TextStyle(color: kTextSecondary, fontSize: 12),
                         filled: true,
                         fillColor: kCardColor,
@@ -275,7 +295,22 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              if (_isScanning) ...[
+                LinearProgressIndicator(
+                  value: _scanProgress,
+                  backgroundColor: kCardColor,
+                  color: kAccentColor,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Progression du balayage : ${(_scanProgress * 100).toStringAsFixed(0)}%",
+                  style: const TextStyle(color: kTextSecondary, fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+              ],
+              const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -286,22 +321,30 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _pingLatencyMs != null ? Icons.wifi : Icons.wifi_off,
-                          color: _pingLatencyMs != null ? Colors.green : Colors.orange,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(_pingResult, style: const TextStyle(color: kTextMain, fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isScanning ? Icons.radar : (_pingLatencyMs != null ? Icons.wifi : Icons.wifi_off),
+                            color: _isScanning ? kAccentColor : (_pingLatencyMs != null ? Colors.green : Colors.orange),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _pingResult,
+                              style: const TextStyle(color: kTextMain, fontSize: 12, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    if (_pingLatencyMs != null)
+                    if (_pingLatencyMs != null && !_isScanning)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
-                        child: Text("$_pingLatencyMs ms", style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                        child: Text("~$_pingLatencyMs ms", style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
