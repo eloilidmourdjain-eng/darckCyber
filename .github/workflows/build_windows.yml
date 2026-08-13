@@ -1,1 +1,38 @@
+name: Build Flutter Windows Executable
 
+on:
+  push:
+    branches: [ main, master ] # Déclenche la compilation lors d'un push sur main ou master
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Build for Windows
+    runs-on: windows-latest # Utilise un environnement Windows distant géré par GitHub
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x' # Utilise la dernière version stable de Flutter
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: darck-cyber-windows-exe
+          path: build/windows/x64/runner/Release/
