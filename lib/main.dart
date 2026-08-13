@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:darckcyber/features/auth/welcome_page.dart';
+import 'package:darck_puls/features/auth/welcome_page.dart';
 
 void main() {
   runApp(const DockPulseApp());
