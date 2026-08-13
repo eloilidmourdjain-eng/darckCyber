@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:darckcyber/features/superAdmin/cyber_tools/offensive/cli_wrapper.dart';
-import 'package:darckcyber/features/superAdmin/cyber_tools/offensive/process_manager.dart';
+import 'package:darck_puls/features/superAdmin/cyber_tools/offensive/cli_wrapper.dart';
+import 'package:darck_puls/features/superAdmin/cyber_tools/offensive/process_manager.dart';
 
 class OffensiveActionPage extends StatelessWidget {
   const OffensiveActionPage({super.key});

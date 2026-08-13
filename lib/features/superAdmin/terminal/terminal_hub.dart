@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:darckcyber/features/superAdmin/terminal/desktop_terminal.dart';
+import 'package:darck_puls/features/superAdmin/terminal/desktop_terminal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:darckcyber/features/superAdmin/terminal/mobile_terminal.dart';
+import 'package:darck_puls/features/superAdmin/terminal/mobile_terminal.dart';
 
 class TerminalHub extends StatelessWidget {
   const TerminalHub({super.key});

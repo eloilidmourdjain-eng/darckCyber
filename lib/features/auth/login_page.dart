@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:darckcyber/features/dashboard/dashboard_page.dart';
+import 'package:darck_puls/features/dashboard/dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

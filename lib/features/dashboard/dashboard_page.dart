@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 // Importations basées sur l'architecture de vos dossiers :
-import 'package:darckcyber/features/auth/welcome_page.dart';
-import 'package:darckcyber/features/auth/login_page.dart';
-import 'package:darckcyber/features/credentials/credentials_page.dart';
-import 'package:darckcyber/features/scan/network_scan_page.dart';
-import 'package:darckcyber/features/simpleAdmin/simple_admin_page.dart';
-import 'package:darckcyber/features/superAdmin/super_admin_page.dart';
+import 'package:darck_puls/features/auth/welcome_page.dart';
+import 'package:darck_puls/features/auth/login_page.dart';
+import 'package:darck_puls/features/credentials/credentials_page.dart';
+import 'package:darck_puls/features/scan/network_scan_page.dart';
+import 'package:darck_puls/features/simpleAdmin/simple_admin_page.dart';
+import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});

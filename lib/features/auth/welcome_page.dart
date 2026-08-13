@@ -1,4 +1,4 @@
-import 'package:darckcyber/features/auth/login_page.dart';
+import 'package:darck_puls/features/auth/login_page.dart';
 import 'package:flutter/material.dart';
 
 class WelcomePage extends StatelessWidget {
