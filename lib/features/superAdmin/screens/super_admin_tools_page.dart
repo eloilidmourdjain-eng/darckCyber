@@ -14,17 +14,16 @@ class SuperAdminToolsPage extends StatefulWidget {
 }
 
 class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerProviderStateMixin {
-  // --- THÈME CYBER ROOT (Red Alert) ---
-  final Color kBackgroundColor = const Color(0xFF05000A); // Noir très profond avec reflet
-  final Color kCardColor = const Color(0xFF130B1C);
-  final Color kRootColor = const Color(0xFFFF2A55); // Rouge Néon (Privilège Root)
-  final Color kTextMain = Colors.white;
-  final Color kTextSecondary = const Color(0xFF94A3B8);
+  // --- THÈME CYBER ROOT (Red Alert) en static const pour éviter les erreurs de constance ---
+  static const Color kBackgroundColor = Color(0xFF05000A);
+  static const Color kCardColor = Color(0xFF130B1C);
+  static const Color kRootColor = Color(0xFFFF2A55);
+  static const Color kTextMain = Colors.white;
+  static const Color kTextSecondary = Color(0xFF94A3B8);
 
   late TabController _tabController;
   late AnimationController _pulseController;
 
-  // États des daemons d'infrastructure
   bool _isN8nActive = true;
   bool _isVgpuBoostEnabled = true;
   bool _isHoneypotDefenseArmed = true;
@@ -53,15 +52,14 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             _buildPremiumAppBar(),
             _buildGlassmorphismTabBar(),
             Expanded(
-              // L'algorithme TabBarView gère le Lazy Loading des modules lourds
               child: TabBarView(
                 controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(), // Désactive le swipe pour éviter les conflits avec le terminal ou les graphiques
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildBlueTeamSocTab(),    // 1. SOC, SIEM, vGPU, n8n
-                  _buildDeceptionTab(),      // 2. Honeypots & Pièges
-                  _buildOffensiveTab(),      // 3. Outils Offensifs (Pentest)
-                  _buildRootTerminalTab(),   // 4. Console Native PTY
+                  _buildBlueTeamSocTab(),
+                  _buildDeceptionTab(),
+                  _buildOffensiveTab(),
+                  _buildRootTerminalTab(),
                 ],
               ),
             ),
@@ -70,10 +68,6 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
       ),
     );
   }
-
-  // ==========================================
-  // COMPOSANTS UI / UX PREMIUM
-  // ==========================================
 
   Widget _buildPremiumAppBar() {
     return Container(
@@ -96,11 +90,11 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
               }
           ),
           const SizedBox(width: 12),
-          Column(
+          const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("SUPER ADMIN CONSOLE", style: TextStyle(color: kRootColor, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-               Text("Clearance Level : ROOT / DEVSECOPS", style: TextStyle(color: kTextSecondary, fontSize: 10, fontFamily: 'monospace')),
+              Text("Clearance Level : ROOT / DEVSECOPS", style: TextStyle(color: kTextSecondary, fontSize: 10, fontFamily: 'monospace')),
             ],
           ),
         ],
@@ -144,13 +138,9 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
     );
   }
 
-  // ==========================================
-  // ONGLET 1 : BLUE TEAM SOC & INFRASTRUCTURE
-  // ==========================================
   Widget _buildBlueTeamSocTab() {
     return Column(
       children: [
-        // Panneau de contrôle Infrastructure (vGPU & n8n)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Row(
@@ -208,17 +198,13 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           ),
         ),
         const SizedBox(height: 12),
-        // INJECTION DU VRAI FICHIER SOC (La 10ème fenêtre)
         const Expanded(
-          child: DefenseDashboardWidget(), // Ton fichier defense_dashboard.dart
+          child: DefenseDashboardWidget(),
         ),
       ],
     );
   }
 
-  // ==========================================
-  // ONGLET 2 : HONEYPOTS & DECEPTION
-  // ==========================================
   Widget _buildDeceptionTab() {
     return Column(
       children: [
@@ -250,17 +236,13 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           ),
         ),
         const SizedBox(height: 12),
-        // INJECTION DU VRAI FICHIER HONEYPOT
         const Expanded(
-          child: HoneypotMonitorWidget(apiBaseUrl: "http://localhost:8080"), // Ton fichier honeypot_monitor_page.dart
+          child: HoneypotMonitorWidget(apiBaseUrl: "http://localhost:8080"),
         ),
       ],
     );
   }
 
-  // ==========================================
-  // ONGLET 3 : OFFENSIVE (RED TEAM)
-  // ==========================================
   Widget _buildOffensiveTab() {
     return Column(
       children: [
@@ -269,7 +251,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: kRootColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: kRootColor.withOpacity(0.3))),
-            child:  Row(
+            child: const Row(
               children: [
                 Icon(CupertinoIcons.exclamationmark_triangle_fill, color: kRootColor, size: 20),
                 SizedBox(width: 10),
@@ -278,23 +260,18 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             ),
           ),
         ),
-        // INJECTION DU VRAI FICHIER OFFENSIF
         const Expanded(
-          child: OffensiveActionPage(), // Ton fichier offensive_panel.dart
+          child: OffensiveActionPage(),
         ),
       ],
     );
   }
 
-  // ==========================================
-  // ONGLET 4 : TERMINAL ROOT NATIF
-  // ==========================================
   Widget _buildRootTerminalTab() {
     return const Column(
       children: [
-        // INJECTION DU VRAI TERMINAL HUB
         Expanded(
-          child: TerminalHub(), // Ton fichier terminal_hub.dart
+          child: TerminalHub(),
         ),
       ],
     );

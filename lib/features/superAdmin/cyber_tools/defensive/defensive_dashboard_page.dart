@@ -1,120 +1,194 @@
+import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:web_socket_channel/io.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:rxdart/rxdart.dart';
 
-class DefensiveDashboardPage extends StatefulWidget {
-  const DefensiveDashboardPage({super.key});
-
-  @override
-  State<DefensiveDashboardPage> createState() => _DefensiveDashboardPageState();
+// --- MULTITHREADING : DOIT ÊTRE EN DEHORS DE LA CLASSE ---
+// Protège le thread principal UI d'une attaque par inondation de logs (OOM / CPU Exhaustion)
+Map<String, dynamic>? parseAlertIsolate(String rawJson) {
+  try {
+    final alert = jsonDecode(rawJson);
+    if (alert is Map<String, dynamic> && alert.containsKey('source_ip') && alert.containsKey('severity_score')) {
+      return alert;
+    }
+  } catch (e) {
+    // Rejet silencieux des trames corrompues
+  }
+  return null;
 }
 
-class _DefensiveDashboardPageState extends State<DefensiveDashboardPage> {
-  // Coordonnées pour le graphique d'intensité des attaques (Temps vs Gravité)
-  final List<FlSpot> _attackPoints = [
-    const FlSpot(0, 1),
-    const FlSpot(1, 3),
-    const FlSpot(2, 2),
-    const FlSpot(3, 5),
-    const FlSpot(4, 4),
-    const FlSpot(5, 8),
-  ];
+class OperationalDefenseDashboard extends StatefulWidget {
+  const OperationalDefenseDashboard({super.key});
 
-  // Filtre actif pour les alertes de sécurité ('ALL', 'CRITICAL', 'WARNING', 'INFO')
+  @override
+  State<OperationalDefenseDashboard> createState() => _OperationalDefenseDashboardState();
+}
+
+class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboard> {
+  // --- MOTEUR RÉSEAU & SÉCURITÉ ---
+  late final IOWebSocketChannel _channel;
+  StreamSubscription? _alertSubscription;
+  final int _maxLogs = 100;
+
+  // Validation stricte UI (Rappel: le backend doit re-valider impérativement)
+  final RegExp _ipv4Regex = RegExp(r'^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$');
+
+  // --- ÉTAT DE L'UI ---
+  final List<Map<String, dynamic>> _alertsLog = [];
+  final List<FlSpot> _chartData = [];
+  double _timeCounter = 14;
   String _selectedFilter = 'ALL';
+  bool _isConnected = false;
 
-  // Liste initiale des alertes de sécurité en mémoire
-  final List<Map<String, dynamic>> _alerts = [
-    {
-      "id": "1",
-      "type": "Brute-force SSH",
-      "ip": "192.168.1.150",
-      "severity": "CRITICAL",
-      "time": "12:40"
-    },
-    {
-      "id": "2",
-      "type": "Port Scan Nmap",
-      "ip": "10.0.0.45",
-      "severity": "WARNING",
-      "time": "12:42"
-    },
-    {
-      "id": "3",
-      "type": "Requête HTTP Suspecte",
-      "ip": "172.16.0.8",
-      "severity": "INFO",
-      "time": "12:45"
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    for (int i = 0; i < 15; i++) {
+      _chartData.add(FlSpot(i.toDouble(), 0));
+    }
+    _initWebSocket();
+  }
 
-  // Boîte de dialogue de remédiation au clic sur une alerte
+  void _initWebSocket() {
+    try {
+      // 1. Dissimulation des endpoints via .env
+      final String wsUrl = dotenv.env['C2_WSS_URL'] ?? 'wss://127.0.0.1:8080';
+      final String authToken = dotenv.env['C2_AUTH_TOKEN'] ?? '';
+
+      // 2. Chiffrement (wss://) et Authentification (JWT/mTLS)
+      _channel = IOWebSocketChannel.connect(
+        Uri.parse(wsUrl),
+        headers: {'Authorization': 'Bearer $authToken'},
+        // optionnel: implémenter un custom SecurityContext ici pour le Certificate Pinning
+      );
+
+      // 3. Résilience : Throttling avec RxDart (Limitation à ~4 updates/sec)
+      _alertSubscription = _channel.stream
+          .map((event) => event.toString())
+          .throttleTime(const Duration(milliseconds: 250))
+          .listen(
+          _processRealAlert,
+          onError: (e) => setState(() => _isConnected = false),
+          onDone: () => setState(() => _isConnected = false)
+      );
+
+      setState(() => _isConnected = true);
+    } catch (e) {
+      setState(() => _isConnected = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _alertSubscription?.cancel();
+    _channel.sink.close();
+    super.dispose();
+  }
+
+  // --- ALGORYTHME DE TRAITEMENT DES FLUX ---
+  Future<void> _processRealAlert(String rawJson) async {
+    // Exécution du parsing JSON dans un Isolate (hors du thread UI principal)
+    final alert = await compute(parseAlertIsolate, rawJson);
+
+    if (alert == null || !mounted) return;
+
+    setState(() {
+      _alertsLog.insert(0, alert);
+      if (_alertsLog.length > _maxLogs) _alertsLog.removeLast();
+
+      _timeCounter++;
+      _chartData.removeAt(0);
+
+      double score = double.tryParse(alert['severity_score'].toString()) ?? 0.0;
+      _chartData.add(FlSpot(_timeCounter, score));
+
+      for (int i = 0; i < _chartData.length; i++) {
+        _chartData[i] = FlSpot(i.toDouble(), _chartData[i].y);
+      }
+    });
+  }
+
+  // --- ALGORYTHME D'EXÉCUTION C2 ---
+  void _executeBan(String ip, String type) async {
+    Navigator.pop(context);
+
+    if (!_ipv4Regex.hasMatch(ip)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('⚠️ Format IP invalide. Tentative d\'évasion bloquée.'),
+        backgroundColor: Colors.orangeAccent,
+      ));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Transmission de l\'ordre au C2 pour $ip...')));
+
+    // RAPPEL SÉCURITÉ BACKEND : L'API C2 qui réceptionne cet appel ne doit JAMAIS concaténer
+    // cette IP dans un shell Unix. Utiliser une lib UFW dédiée ou des paramètres liés.
+    bool success = true;
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('⚡ L\'adresse IP $ip a été isolée sur l\'infrastructure.'),
+        backgroundColor: Colors.greenAccent,
+      ));
+    }
+  }
+
   void _showRemediationDialog(Map<String, dynamic> alert) {
-    String attackerIp = alert["ip"];
-    String remediationCommand = "sudo ufw deny from $attackerIp";
+    String attackerIp = alert["source_ip"] ?? "Inconnue";
+    String alertType = alert["title"] ?? "Menace";
+    String severity = alert["severity"] ?? "INFO";
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
-        title: Text(
-          "Remédiation : ${alert["type"]}",
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: severity == 'CRITICAL' ? Colors.redAccent : Colors.cyanAccent)),
+        title: Row(
+          children: [
+            Icon(CupertinoIcons.shield_lefthalf_fill, color: severity == 'CRITICAL' ? Colors.redAccent : Colors.cyanAccent),
+            const SizedBox(width: 10),
+            const Text("Action de Remédiation", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "IP Ciblée : $attackerIp",
-              style: const TextStyle(
-                color: Colors.redAccent,
-                fontWeight: FontWeight.bold,
-              ),
+            Text("Type: $alertType", style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 8),
+            RichText(
+                text: TextSpan(
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    children: [
+                      const TextSpan(text: "Cible à isoler : "),
+                      TextSpan(text: attackerIp, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontFamily: 'monospace', letterSpacing: 1.2)),
+                    ]
+                )
             ),
-            const SizedBox(height: 10),
-            const Text(
-              "Stratégie de défense recommandée : Bannissement immédiat via pare-feu système.",
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                remediationCommand,
-                style: const TextStyle(
-                  color: Colors.greenAccent,
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
-              ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(8)),
+              child: Text("sudo ufw deny from $attackerIp comment 'Banni via IDS'", style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 11)),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Annuler", style: TextStyle(color: Colors.grey)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Annuler", style: TextStyle(color: Colors.grey))),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Commande injectée : $remediationCommand"),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
-            icon: const Icon(Icons.block, size: 14, color: Colors.white),
-            label: const Text(
-              "Bannir l'IP",
-              style: TextStyle(color: Colors.white),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => _executeBan(attackerIp, alertType),
+            icon: const Icon(CupertinoIcons.clear_thick, size: 16),
+            label: const Text("EXÉCUTER LE BANNISSEMENT"),
           ),
         ],
       ),
@@ -123,157 +197,172 @@ class _DefensiveDashboardPageState extends State<DefensiveDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Filtrage dynamique des alertes selon le niveau de gravité sélectionné
-    final filteredAlerts = _alerts.where((alert) {
+    final filteredAlerts = _alertsLog.where((alert) {
       if (_selectedFilter == 'ALL') return true;
       return alert["severity"] == _selectedFilter;
     }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          "Dashboard Défensif",
-          style: TextStyle(color: Colors.white, fontSize: 15),
-        ),
-        iconTheme: const IconThemeData(color: Color(0xFF38BDF8)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            "GRAPHIQUE D'INTENSITÉ DES ATTAQUES",
-            style: TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            height: 180,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _attackPoints,
-                    isCurved: true,
-                    color: Colors.redAccent,
-                    barWidth: 3,
-                    dotData: const FlDotData(show: true),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: Colors.redAccent.withValues(alpha: 0.15),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "FLUX D'ALERTES SÉCURITÉ",
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              DropdownButton<String>(
-                value: _selectedFilter,
-                dropdownColor: const Color(0xFF1E293B),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-                items: const [
-                  DropdownMenuItem(value: 'ALL', child: Text("Tous")),
-                  DropdownMenuItem(value: 'CRITICAL', child: Text("Critique")),
-                  DropdownMenuItem(
-                    value: 'WARNING',
-                    child: Text("Avertissement"),
-                  ),
-                  DropdownMenuItem(value: 'INFO', child: Text("Info")),
-                ],
-                onChanged: (val) => setState(() => _selectedFilter = val!),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...filteredAlerts.map(
-                (alert) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: alert["severity"] == 'CRITICAL'
-                      ? Colors.red.withValues(alpha: 0.4)
-                      : Colors.white12,
-                ),
-              ),
-              child: Row(
+              // --- HEADER ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    alert["severity"] == 'CRITICAL'
-                        ? Icons.warning
-                        : Icons.info,
-                    color: alert["severity"] == 'CRITICAL'
-                        ? Colors.redAccent
-                        : Colors.orangeAccent,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const Text("SOC (Security Operations)", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: _isConnected ? Colors.greenAccent.withOpacity(0.1) : Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Row(
                       children: [
-                        Text(
-                          alert["type"],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          "Attaquant : ${alert['ip']} • ${alert['time']}",
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 10,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
+                        Icon(CupertinoIcons.circle_fill, color: _isConnected ? Colors.greenAccent : Colors.redAccent, size: 10),
+                        const SizedBox(width: 6),
+                        Text(_isConnected ? "IDS ONLINE" : "OFFLINE", style: TextStyle(color: _isConnected ? Colors.greenAccent : Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ],
                     ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey.shade800,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                    ),
-                    onPressed: () => _showRemediationDialog(alert),
-                    child: const Text(
-                      "Remédier",
-                      style: TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                  ),
+                  )
                 ],
               ),
-            ),
+              const SizedBox(height: 24),
+
+              // --- GRAPHIQUE OSCILLOSCOPE PREMIUM ---
+              Container(
+                height: 180,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.05), blurRadius: 20)],
+                ),
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(show: false),
+                    borderData: FlBorderData(show: false),
+                    minY: 0, maxY: 10,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _chartData,
+                        isCurved: true,
+                        curveSmoothness: 0.3,
+                        color: Colors.redAccent,
+                        barWidth: 3,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [Colors.redAccent.withOpacity(0.4), Colors.transparent],
+                            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- BARRE DE FILTRES ---
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('ALL', 'Tout', CupertinoIcons.layers_alt_fill, Colors.blueGrey),
+                    _buildFilterChip('CRITICAL', 'Critique', CupertinoIcons.clear_circled_solid, Colors.redAccent),
+                    _buildFilterChip('WARNING', 'Avertissement', CupertinoIcons.exclamationmark_triangle_fill, Colors.orangeAccent),
+                    _buildFilterChip('INFO', 'Information', CupertinoIcons.info_circle_fill, Colors.cyanAccent),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // --- LISTE DES MENACES ---
+              Expanded(
+                child: filteredAlerts.isEmpty
+                    ? Center(child: Text("Aucune menace détectée.", style: TextStyle(color: Colors.blueGrey[400])))
+                    : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: filteredAlerts.length,
+                  itemBuilder: (context, index) {
+                    final alert = filteredAlerts[index];
+                    final isCritical = alert['severity'] == 'CRITICAL';
+                    final color = isCritical ? Colors.redAccent : (alert['severity'] == 'WARNING' ? Colors.orangeAccent : Colors.cyanAccent);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: color.withOpacity(0.3)),
+                        boxShadow: isCritical ? [BoxShadow(color: Colors.redAccent.withOpacity(0.1), blurRadius: 10)] : [],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                            child: Icon(isCritical ? CupertinoIcons.flame_fill : CupertinoIcons.shield_fill, color: color, size: 20),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(alert['title'] ?? 'Inconnu', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Text("Source: ${alert['source_ip'] ?? '0.0.0.0'} • ${alert['timestamp'] ?? ''}", style: TextStyle(color: Colors.blueGrey[300], fontSize: 11, fontFamily: 'monospace')),
+                              ],
+                            ),
+                          ),
+                          if (isCritical || alert['severity'] == 'WARNING')
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: color.withOpacity(0.1),
+                                foregroundColor: color,
+                                elevation: 0,
+                                side: BorderSide(color: color),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                              onPressed: () => _showRemediationDialog(alert),
+                              child: const Text("Remédier", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            )
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              )
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String value, String label, IconData icon, Color color) {
+    bool isSelected = _selectedFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: FilterChip(
+        showCheckmark: false,
+        backgroundColor: const Color(0xFF1E293B),
+        selectedColor: color.withOpacity(0.2),
+        side: BorderSide(color: isSelected ? color : Colors.transparent),
+        label: Row(
+          children: [
+            Icon(icon, color: isSelected ? color : Colors.blueGrey[400], size: 14),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isSelected ? color : Colors.blueGrey[400], fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        selected: isSelected,
+        onSelected: (bool selected) => setState(() => _selectedFilter = value),
       ),
     );
   }

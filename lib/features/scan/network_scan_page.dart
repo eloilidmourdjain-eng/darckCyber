@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:dart_ping/dart_ping.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 
 // Constantes de design issues du Dashboard
 const Color kBackgroundColor = Color(0xFF0F172A);
@@ -7,6 +10,136 @@ const Color kCardColor = Color(0xFF1E293B);
 const Color kAccentColor = Color(0xFF38BDF8);
 const Color kTextMain = Colors.white;
 const Color kTextSecondary = Color(0xFF94A3B8);
+
+// Modèles et Service de découverte réseau intégrés
+class NetworkDevice {
+  final String ip;
+  int pingMs;
+  List<int> openPorts;
+  String vendor;
+  String type;
+
+  NetworkDevice({
+    required this.ip,
+    required this.pingMs,
+    this.openPorts = const [],
+    this.vendor = 'Inconnu',
+    this.type = 'device',
+  });
+}
+
+class NetworkDiscoveryService {
+  final NetworkInfo _networkInfo = NetworkInfo();
+
+  Future<String?> getLocalSubnet() async {
+    try {
+      final ipAddress = await _networkInfo.getWifiIP();
+      if (ipAddress != null && ipAddress.contains('.')) {
+        List<String> parts = ipAddress.split('.');
+        parts.removeLast();
+        return parts.join('.');
+      }
+    } catch (e) {
+      debugPrint("Erreur IP: $e");
+    }
+    return null;
+  }
+
+  Future<List<NetworkDevice>> scanSubnet(String subnet, {Function(double progress)? onProgress}) async {
+    List<NetworkDevice> activeDevices = [];
+    List<Future<void>> scanTasks = [];
+    int completedTasks = 0;
+
+    for (int i = 1; i < 255; i++) {
+      final targetIp = '$subnet.$i';
+      scanTasks.add(
+        _pingAndDiscover(targetIp).then((device) {
+          completedTasks++;
+          if (onProgress != null) {
+            onProgress(completedTasks / 254);
+          }
+          if (device != null) {
+            activeDevices.add(device);
+          }
+        }),
+      );
+    }
+    await Future.wait(scanTasks);
+    activeDevices.sort((a, b) {
+      int ipA = int.parse(a.ip.split('.').last);
+      int ipB = int.parse(b.ip.split('.').last);
+      return ipA.compareTo(ipB);
+    });
+    return activeDevices;
+  }
+
+  Future<NetworkDevice?> _pingAndDiscover(String ip) async {
+    try {
+      final ping = Ping(ip, count: 1, timeout: 1);
+      final response = await ping.stream.first;
+
+      if (response.response != null && response.response!.time != null) {
+        int pingTime = response.response!.time!.inMilliseconds;
+        NetworkDevice device = NetworkDevice(ip: ip, pingMs: pingTime);
+        device.openPorts = await _quickPortScan(ip);
+        device.type = _guessDeviceType(device.openPorts, ip);
+
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+          device.vendor = await _getMacFromArp(ip);
+        } else {
+          device.vendor = "Non autorisé (Mobile)";
+        }
+        return device;
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return null;
+  }
+
+  Future<List<int>> _quickPortScan(String ip) async {
+    List<int> openPorts = [];
+    List<int> portsToCheck = [22, 53, 80, 443, 8080];
+
+    for (int port in portsToCheck) {
+      try {
+        final socket = await Socket.connect(ip, port, timeout: const Duration(milliseconds: 300));
+        openPorts.add(port);
+        socket.destroy();
+      } catch (e) {
+        // Port fermé
+      }
+    }
+    return openPorts;
+  }
+
+  String _guessDeviceType(List<int> openPorts, String ip) {
+    if (ip.endsWith('.1') || ip.endsWith('.254')) return 'router';
+    if (openPorts.contains(80) || openPorts.contains(443)) return 'server';
+    if (openPorts.contains(22)) return 'server';
+    return 'mobile';
+  }
+
+  Future<String> _getMacFromArp(String ip) async {
+    try {
+      ProcessResult result;
+      if (Platform.isWindows) {
+        result = await Process.run('arp', ['-a', ip]);
+      } else {
+        result = await Process.run('arp', ['-n', ip]);
+      }
+      String out = result.stdout.toString();
+      RegExp macRegex = RegExp(r'([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})');
+      var match = macRegex.firstMatch(out);
+      if (match != null) {
+        return match.group(0)!.toUpperCase();
+      }
+    } catch (e) {
+      // Ignorer
+    }
+    return "Inconnu";
+  }
+}
 
 class NetworkScanPage extends StatefulWidget {
   const NetworkScanPage({super.key});
@@ -17,9 +150,9 @@ class NetworkScanPage extends StatefulWidget {
 
 class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TextEditingController _ipController = TextEditingController(text: "192.168.1.1");
+  final TextEditingController _ipController = TextEditingController();
+  final NetworkDiscoveryService _discoveryService = NetworkDiscoveryService();
 
-  // États du Wi-Fi et du Partage de Connexion (Hotspot Admin)
   bool _isWifiConnected = true;
   bool _isHotspotSharingActive = true;
   final String _currentWifiSSID = "DARCK_CYBER_SECURE_WIFI";
@@ -30,49 +163,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   String _pingResult = "Prêt à scanner le réseau local";
   int? _pingLatencyMs;
 
-  // Liste dynamique des équipements connectés sur le réseau de l'administrateur
-  final List<Map<String, dynamic>> _connectedDevices = [
-    {
-      "name": "Admin-Workstation-PC",
-      "ip": "192.168.1.10",
-      "mac": "74:DA:38:A1:B2:C3",
-      "type": "Ordinateur (Windows/Kali)",
-      "status": "Actif",
-      "bandwidth": "14.2 Mo/s",
-      "signal": "Excellent (-42 dBm)",
-      "isBlocked": false,
-    },
-    {
-      "name": "Smartphone-Infinix-X6531",
-      "ip": "192.168.1.25",
-      "mac": "A0:12:90:55:67:88",
-      "type": "Mobile Android",
-      "status": "Actif",
-      "bandwidth": "2.1 Mo/s",
-      "signal": "Bon (-60 dBm)",
-      "isBlocked": false,
-    },
-    {
-      "name": "IoT-Arduino-Radar-Node",
-      "ip": "192.168.1.50",
-      "mac": "3C:71:BF:12:44:99",
-      "type": "Microcontrôleur / Capteur",
-      "status": "Actif",
-      "bandwidth": "120 Ko/s",
-      "signal": "Stable (-68 dBm)",
-      "isBlocked": false,
-    },
-    {
-      "name": "Guest-Device-Unknown",
-      "ip": "192.168.1.88",
-      "mac": "58:EF:68:33:11:22",
-      "type": "Appareil Inconnu",
-      "status": "Suspect",
-      "bandwidth": "5.8 Mo/s",
-      "signal": "Faible (-82 dBm)",
-      "isBlocked": false,
-    },
-  ];
+  List<Map<String, dynamic>> _connectedDevices = [];
 
   final List<Map<String, dynamic>> _portsToScan = [
     {"port": 21, "service": "FTP", "isOpen": false, "scanned": true},
@@ -87,6 +178,18 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _initializeSubnet();
+  }
+
+  Future<void> _initializeSubnet() async {
+    final subnet = await _discoveryService.getLocalSubnet();
+    if (subnet != null) {
+      setState(() {
+        _ipController.text = "$subnet.0/24";
+      });
+    } else {
+      _ipController.text = "192.168.1.0/24";
+    }
   }
 
   @override
@@ -96,58 +199,59 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
     super.dispose();
   }
 
-  // Simulation d'un scan réseau global et balayage asynchrone (Ping Sweep)
   Future<void> _runNetworkScan() async {
-    final String targetIpInput = _ipController.text.trim();
-    if (targetIpInput.isEmpty) return;
+    String input = _ipController.text.replaceAll('/24', '').trim();
+    String subnet = "192.168.1";
+
+    if (input.contains('.')) {
+      List<String> parts = input.split('.');
+      if (parts.length >= 3) {
+        subnet = "${parts[0]}.${parts[1]}.${parts[2]}";
+      }
+    }
 
     setState(() {
       _isScanning = true;
       _scanProgress = 0.0;
       _pingResult = "Balayage asynchrone du sous-réseau en cours...";
       _pingLatencyMs = null;
+      _connectedDevices.clear();
     });
-
-    String subnet = "192.168.1.";
-    if (targetIpInput.contains('.')) {
-      List<String> parts = targetIpInput.split('.');
-      if (parts.length >= 3) {
-        subnet = "${parts[0]}.${parts[1]}.${parts[2]}.";
-      }
-    }
-
-    int totalHostsToSweep = 20;
-    int activeCount = 0;
 
     final stopwatch = Stopwatch()..start();
 
-    for (int i = 1; i <= totalHostsToSweep; i++) {
-      if (!mounted) break;
-
-      // Simulation asynchrone d'un test de présence réseau
-      await Future.delayed(const Duration(milliseconds: 120));
-
-      setState(() {
-        _scanProgress = i / totalHostsToSweep;
-      });
-
-      if (i == 1 || i == 4 || i == 10 || i == 15 || i == 19) {
-        activeCount++;
+    List<NetworkDevice> devices = await _discoveryService.scanSubnet(subnet, onProgress: (progress) {
+      if (mounted) {
+        setState(() => _scanProgress = progress);
       }
-    }
+    });
 
     stopwatch.stop();
 
-    setState(() {
-      _isScanning = false;
-      _pingLatencyMs = stopwatch.elapsedMilliseconds ~/ totalHostsToSweep;
-      _pingResult = "Balayage terminé : $activeCount hôtes actifs découverts sur $subnet(0/24)";
-    });
+    List<Map<String, dynamic>> mappedDevices = devices.map((d) {
+      return {
+        "name": d.type == 'router' ? "Passerelle / Routeur" : "Appareil ${d.type}",
+        "ip": d.ip,
+        "mac": d.vendor,
+        "type": d.type.toUpperCase(),
+        "status": "Actif",
+        "bandwidth": "N/A",
+        "signal": "${d.pingMs} ms",
+        "isBlocked": false,
+      };
+    }).toList();
 
     if (mounted) {
+      setState(() {
+        _isScanning = false;
+        _connectedDevices = mappedDevices;
+        _pingLatencyMs = stopwatch.elapsedMilliseconds ~/ (devices.isEmpty ? 1 : devices.length);
+        _pingResult = "Balayage terminé : ${devices.length} hôtes actifs découverts sur $subnet.0/24";
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Scan réseau et cartographie asynchrone terminés avec succès."),
+        SnackBar(
+          content: Text("Scan réseau asynchrone terminé avec succès (${devices.length} appareils)."),
           backgroundColor: Colors.green,
         ),
       );
@@ -187,8 +291,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
             _buildDetailRow("Adresse MAC", device["mac"]),
             _buildDetailRow("Type d'appareil", device["type"]),
             _buildDetailRow("État de connexion", device["status"]),
-            _buildDetailRow("Consommation trafic", device["bandwidth"]),
-            _buildDetailRow("Puissance du signal", device["signal"]),
+            _buildDetailRow("Latence / Signal", device["signal"]),
             _buildDetailRow("Statut du pare-feu", device["isBlocked"] ? "BLOQUÉ (Hors réseau)" : "AUTORISÉ (Connecté)"),
             const Spacer(),
             SizedBox(
@@ -257,9 +360,6 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
       body: TabBarView(
         controller: _tabController,
         children: [
-          // =================================================================
-          // ONGLET 1 : SCANNER RÉSEAU & PING CIBLE
-          // =================================================================
           ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -272,7 +372,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                       controller: _ipController,
                       style: const TextStyle(color: kTextMain, fontSize: 13),
                       decoration: InputDecoration(
-                        labelText: "Adresse IP / Sous-réseau",
+                        labelText: "Sous-réseau (ex: 192.168.1.0/24)",
                         labelStyle: const TextStyle(color: kTextSecondary, fontSize: 12),
                         filled: true,
                         fillColor: kCardColor,
@@ -344,7 +444,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
-                        child: Text("~$_pingLatencyMs ms", style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                        child: Text("~$_pingLatencyMs ms avg", style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
                   ],
                 ),
@@ -387,9 +487,6 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
             ],
           ),
 
-          // =================================================================
-          // ONGLET 2 : CONTRÔLE TOTAL DES ÉQUIPEMENTS CONNECTÉS
-          // =================================================================
           Column(
             children: [
               Container(
@@ -416,7 +513,9 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                 ),
               ),
               Expanded(
-                child: ListView.builder(
+                child: _connectedDevices.isEmpty
+                    ? const Center(child: Text("Aucun équipement détecté. Lancez un scan.", style: TextStyle(color: kTextSecondary)))
+                    : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _connectedDevices.length,
                   itemBuilder: (context, index) {
@@ -436,8 +535,8 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                       child: Row(
                         children: [
                           Icon(
-                            Icons.computer,
-                            color: isBlocked ? Colors.red : (device["status"] == "Suspect" ? Colors.orange : kAccentColor),
+                            device["type"] == "MOBILE" ? Icons.smartphone : (device["type"] == "ROUTER" ? Icons.router : Icons.computer),
+                            color: isBlocked ? Colors.red : kAccentColor,
                             size: 24,
                           ),
                           const SizedBox(width: 12),
@@ -449,7 +548,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                                 const SizedBox(height: 2),
                                 Text("${device["ip"]} • ${device["mac"]}", style: const TextStyle(color: kTextSecondary, fontSize: 10, fontFamily: 'monospace')),
                                 const SizedBox(height: 4),
-                                Text("Trafic: ${device['bandwidth']}", style: const TextStyle(color: kAccentColor, fontSize: 10)),
+                                Text("Latence: ${device['signal']}", style: const TextStyle(color: kAccentColor, fontSize: 10)),
                               ],
                             ),
                           ),
@@ -473,7 +572,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(val ? "Accès autorisé pour ${device['name']}" : "Équipement bloqué du réseau."),
+                                      content: Text(val ? "Accès autorisé pour ${device['ip']}" : "Équipement bloqué du réseau."),
                                       backgroundColor: val ? Colors.green : Colors.red,
                                     ),
                                   );
@@ -490,9 +589,6 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
             ],
           ),
 
-          // =================================================================
-          // ONGLET 3 : WI-FI & DISTRIBUTION DE CONNEXION INTERNET
-          // =================================================================
           ListView(
             padding: const EdgeInsets.all(16),
             children: [

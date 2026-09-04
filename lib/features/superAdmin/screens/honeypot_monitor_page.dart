@@ -1,7 +1,32 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:darck_puls/features/superAdmin/models/honeypot_alert.dart';
+
+class HoneypotAlert {
+  final String triggerType;
+  final String ipAddress;
+  final String deviceFingerprint;
+  final String timestamp;
+  final String userId;
+
+  HoneypotAlert({
+    required this.triggerType,
+    required this.ipAddress,
+    required this.deviceFingerprint,
+    required this.timestamp,
+    required this.userId,
+  });
+
+  factory HoneypotAlert.fromJson(Map<String, dynamic> json) {
+    return HoneypotAlert(
+      triggerType: json['trigger_type'] ?? 'Inconnu',
+      ipAddress: json['ip_address'] ?? '0.0.0.0',
+      deviceFingerprint: json['device_fingerprint'] ?? 'N/A',
+      timestamp: json['timestamp'] ?? '',
+      userId: json['user_id'] ?? '',
+    );
+  }
+}
 
 class HoneypotMonitorWidget extends StatefulWidget {
   final String apiBaseUrl;
@@ -100,56 +125,51 @@ class _HoneypotMonitorWidgetState extends State<HoneypotMonitorWidget> {
             'Aucune intrusion détectée pour le moment. Système sécurisé.',
             style: TextStyle(color: Colors.grey, fontSize: 12),
           )
-              : ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: alerts.length,
-            itemBuilder: (context, index) {
-              final alert = alerts[index];
-              return Card(
-                color: Colors.red.shade900.withValues(alpha: 0.2),
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(color: Colors.red.shade300, width: 1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ALERTE : ${alert.triggerType}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.redAccent),
-                      ),
-                      const SizedBox(height: 6),
-                      Text('📍 Adresse IP : ${alert.ipAddress}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                      Text('🖥️ Appareil : ${alert.deviceFingerprint}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                      Text('🕒 Heure : ${alert.timestamp}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: _fetchAlerts,
-                            child: const Text('Ignorer', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            onPressed: () => _blockAttacker(alert.ipAddress, alert.userId),
-                            child: const Text('BANNIR L\'IP & COUPER LES ACCÈS', style: TextStyle(color: Colors.white, fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ],
+              : Expanded(
+            child: ListView.builder(
+              itemCount: alerts.length,
+              itemBuilder: (context, index) {
+                final alert = alerts[index];
+                return Card(
+                  color: Colors.red.shade900.withValues(alpha: 0.2),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.red.shade300, width: 1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-              );
-            },
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ALERTE : ${alert.triggerType}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.redAccent),
+                        ),
+                        const SizedBox(height: 6),
+                        Text('📍 Adresse IP : ${alert.ipAddress}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        Text('🖥️ Appareil : ${alert.deviceFingerprint}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                        Text('🕒 Heure : ${alert.timestamp}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              onPressed: () => _blockAttacker(alert.ipAddress, alert.userId),
+                              child: const Text('BANNIR L\'IP & COUPER LES ACCÈS', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

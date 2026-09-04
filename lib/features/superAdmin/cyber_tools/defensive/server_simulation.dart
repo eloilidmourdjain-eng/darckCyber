@@ -1,92 +1,93 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'dart:io';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() async {
-  // Liste de tous les administrateurs (consoles Flutter) connectés
-  final List<WebSocketChannel> connectedClients = [];
-  final Random random = Random();
+  // SÉCURITÉ ARCHITECTURALE : Utilisation d'un Set thread-safe/géré proprement pour les clients
+  final Set<WebSocketChannel> clients = {};
 
-  // Liste de fausses attaques pour simuler l'activité réseau
-  final List<Map<String, dynamic>> attackTemplates = [
-    {
-      "title": "Brute-force SSH détecté (Hydra)",
-      "target": "Routeur_Core_Linux",
-      "severity": "CRITICAL",
-      "severity_score": 9.2
-    },
-    {
-      "title": "Scan de vulnérabilités Web (Nikto)",
-      "target": "Console_Admin_Web",
-      "severity": "WARNING",
-      "severity_score": 5.4
-    },
-    {
-      "title": "Tentative d'injection SQL sur l'API",
-      "target": "Base_Donnees_IoT",
-      "severity": "CRITICAL",
-      "severity_score": 8.7
-    },
-    {
-      "title": "Ping anormal détecté (Scan Nmap)",
-      "target": "Passerelle_VPN",
-      "severity": "INFO",
-      "severity_score": 2.1
-    },
-    {
-      "title": "Appareil IoT non autorisé connecté",
-      "target": "Commutateur_Etage_1",
-      "severity": "WARNING",
-      "severity_score": 4.5
-    }
-  ];
-
-  // Configuration du gestionnaire WebSocket[cite: 4]
   var handler = webSocketHandler((WebSocketChannel webSocket) {
-    connectedClients.add(webSocket);
-    print("💻 Une console d'administration Flutter vient de se connecter.");
+    clients.add(webSocket);
+    print("🔌 Nouvelle liaison sécurisée établie avec un client dashboard.");
 
-    // Nettoyage lorsque la console se déconnecte[cite: 4]
+    // Écoute des messages entrants pour gérer la fermeture ou le ping/pong
     webSocket.stream.listen(
-          (message) {},
+          (message) {
+        // Traitement optionnel des commandes de contrôle reçues du client
+      },
       onDone: () {
-        connectedClients.remove(webSocket);
-        print("❌ Une console s'est déconnectée.");
+        clients.remove(webSocket);
+        print("🔌 Déconnexion propre d'un client dashboard.");
+      },
+      onError: (error) {
+        clients.remove(webSocket);
+        print("⚠️ Erreur de socket client détectée : $error");
       },
     );
   });
 
-  // Démarrage du serveur sur le port 8080[cite: 4]
-  var server = await io.serve(handler, '0.0.0.0', 8080);
-  print('🚀 Serveur de sécurité en temps réel actif sur : ws://${server.address.address}:${server.port}');
+  // Démarrage sécurisé du serveur HTTP/WS sur l'interface locale ou durcie
+  final server = await io.serve(handler, '0.0.0.0', 8080);
+  print('🚀 Serveur IDS Réel (Dark Pulse SecOps) actif sur le port ${server.port}');
 
-  // Boucle de génération d'alertes en temps réel (toutes les 3 secondes)[cite: 4]
-  Timer.periodic(const Duration(seconds: 3), (timer) {
-    if (connectedClients.isEmpty) return;
+  // SÉCURITÉ : Vérification de l'existence du fichier de log avant de lancer le processus
+  const logPath = '/var/log/auth.log';
+  final logFile = File(logPath);
 
-    // Sélection aléatoire d'une attaque[cite: 4]
-    final template = attackTemplates[random.nextInt(attackTemplates.length)];
+  if (!await logFile.exists()) {
+    print("❌ Avertissement critique : Le fichier de journalisation $logPath est introuvable.");
+    print("💡 Assurez-vous que rsyslog est actif ou ajustez la source vers journalctl.");
+    return;
+  }
 
-    // Génération d'une IP source aléatoire pour le réalisme[cite: 4]
-    final String randomIp = "192.168.1.${random.nextInt(254) + 1}";
+  try {
+    // --- ALGORITHME D'ANALYSE DE LOGS SÉCURISÉ (Tail -f) ---
+    final process = await Process.start('tail', ['-F', logPath]);
 
-    final Map<String, dynamic> alertPacket = {
-      "title": template["title"],
-      "source_ip": randomIp,
-      "target": template["target"],
-      "severity": template["severity"],
-      "severity_score": template["severity_score"],
-      "timestamp": DateTime.now().toIso8601String().substring(11, 19)
-    };
+    // Regex stricte pour capturer l'IP source des échecs d'authentification SSH
+    final regexFailed = RegExp(r'Failed password for (?:invalid user )?.* from ([0-9a-fA-F:\.]+) port');
 
-    // Diffusion du paquet JSON à toutes les consoles Flutter connectées[cite: 4]
-    final String jsonString = jsonEncode(alertPacket);
-    for (var client in connectedClients) {
-      client.sink.add(jsonString);
-    }
-    print("🚨 Alerte diffusée : ${template["title"]} depuis $randomIp");
-  });
+    process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) {
+      if (line.contains('Failed password')) {
+        final match = regexFailed.firstMatch(line);
+        if (match != null) {
+          final attackerIp = match.group(1)!;
+
+          final alertPacket = {
+            "title": "Brute-force SSH détecté",
+            "source_ip": attackerIp,
+            "target": "Serveur_Core",
+            "severity": "CRITICAL",
+            "severity_score": 9.5,
+            "timestamp": DateTime.now().toIso8601String().substring(11, 19)
+          };
+
+          final jsonString = jsonEncode(alertPacket);
+
+          // DIFFUSION SÉCURISÉE : Itération sur une copie/Set pour éviter les erreurs de modification concurrente
+          for (var client in List.from(clients)) {
+            try {
+              client.sink.add(jsonString);
+            } catch (e) {
+              print("❌ Échec d'envoi au client, suppression de la socket zombie : $e");
+              clients.remove(client);
+              client.sink.close();
+            }
+          }
+          print("🚨 Menace Réelle isolée et diffusée : $attackerIp");
+        }
+      }
+    }, onError: (err) {
+      print("❌ Erreur critique du processus tail : $err");
+    });
+
+  } catch (e) {
+    print("❌ Impossible de démarrer le sous-système de surveillance des logs : $e");
+  }
 }
