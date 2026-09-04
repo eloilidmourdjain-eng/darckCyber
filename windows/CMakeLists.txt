@@ -1,4 +1,5 @@
 # Project-level configuration.
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 cmake_minimum_required(VERSION 3.14)
 project(darckcyber LANGUAGES CXX)
 
