@@ -45,8 +45,9 @@ class _LoginPageState extends State<LoginPage> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        // Ajout du paramètre obligatoire 'userRole' et retrait du 'const'
-        builder: (context) => DashboardPage(userRole: _selectedRole),
+        // Remplacement de DashboardPage par MainNavigationScreen
+        // et utilisation du paramètre 'role'
+        builder: (context) => MainNavigationScreen(role: _selectedRole),
       ),
     );
   }
@@ -253,7 +254,6 @@ class _LoginPageState extends State<LoginPage> {
     final defaultPinTheme = PinTheme(
       width: 60,
       height: 60,
-      // Correction de la typographie jetBrainsMono (B majuscule)
       textStyle: GoogleFonts.jetBrainsMono(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold),
       decoration: BoxDecoration(
           color: const Color(0xFF0F172A),

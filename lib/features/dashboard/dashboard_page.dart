@@ -2,12 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 
-// =====================================================================
-// ⚠️ IMPORTS GÉRÉS SELON TON ARBORESCENCE (Vus sur tes captures)
-// =====================================================================
+
 import 'package:darck_puls/features/auth/login_page.dart'; // Pour la déconnexion
 
 // Importation de toutes tes fenêtres métiers
+import 'package:darck_puls/core/models/user_role.dart';
 import 'package:darck_puls/features/scan/network_scan_page.dart';
 import 'package:darck_puls/features/network_analysis/wifi_analyzer_screen.dart';
 import 'package:darck_puls/features/security/security_alerts_screen.dart';
@@ -22,7 +21,7 @@ import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 // import 'package:darck_puls/features/dashboard/home_summary_page.dart';
 
 // --- DÉFINITION DES RÔLES (Sécurité RBAC) ---
-enum UserRole { simpleAdmin, superAdmin }
+
 
 class MainNavigationScreen extends StatefulWidget {
   final UserRole role; // Habilitation injectée lors du Login
