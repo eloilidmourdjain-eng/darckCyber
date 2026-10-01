@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-
-// --- MODÈLES DE DONNÉES ---
+// ==========================================
+// MODÈLES DE DONNÉES SÉCURISÉS
+// ==========================================
 class ConfigBackup {
   final String id;
   final String timestamp;
@@ -14,339 +15,426 @@ class ConfigBackup {
   ConfigBackup(this.id, this.timestamp, this.author, this.description, this.isStable);
 }
 
+class SystemLog {
+  final String id;
+  final String timestamp;
+  final String event;
+  final bool isImmutable;
+  String? editableNote;
+
+  SystemLog(this.id, this.timestamp, this.event, this.isImmutable, {this.editableNote});
+}
+
+class MaintenanceTask {
+  final String title;
+  final String scheduledTime;
+  final String status;
+  MaintenanceTask(this.title, this.scheduledTime, this.status);
+}
+
+// Niveaux d'alerte pour le Dashboard SRE
+enum AlertSeverity { info, warning, critical }
+
+// ==========================================
+// ÉCRAN PRINCIPAL SRE & NETOPS
+// ==========================================
 class MaintenanceScreen extends StatefulWidget {
-  const MaintenanceScreen({Key? key}) : super(key: key);
+  const MaintenanceScreen({super.key});
 
   @override
-  _MaintenanceScreenState createState() => _MaintenanceScreenState();
+  State<MaintenanceScreen> createState() => _MaintenanceScreenState();
 }
 
-class _MaintenanceScreenState extends State<MaintenanceScreen> {
-  // --- VARIABLES D'ÉTAT ---
-  bool _isRunningDiagnostics = false;
-  double _diagnosticProgress = 0.0;
+class _MaintenanceScreenState extends State<MaintenanceScreen> with TickerProviderStateMixin {
+late TabController _tabController;
+late AnimationController _pulseController;
 
-  double _cpuUsage = 45.0;
-  double _ramUsage = 78.0;
-  double _tempCelsius = 62.0;
+// --- ÉTATS : TÉLÉMÉTRIE ---
+double _cpuUsage = 45.0;
+double _ramUsage = 78.0;
+double _tempCelsius = 62.0;
+bool _isVastAiActive = false;
+late Timer _telemetryTimer;
 
-  final List<ConfigBackup> _backups = [
-    ConfigBackup("v2.4.1", "Aujourd'hui, 04:30 AM", "Auto-Backup", "Sauvegarde quotidienne", true),
-    ConfigBackup("v2.4.0", "Hier, 14:15 PM", "Admin (John)", "Ajout VLAN 20 (Compta)", true),
-    ConfigBackup("v2.3.9", "20 Août 2026", "SuperAdmin", "Mise à jour Firmware OSPF", true),
-  ];
+// --- ÉTATS : DIAGNOSTICS & LOGS ---
+bool _isRunningDiagnostics = false;
+double _diagnosticProgress = 0.0;
+bool _showImmutableLogs = true;
+String? _diagnosticAlert; // Pour simuler une alerte après le scan
 
-  late Timer _telemetryTimer;
+// --- BASES DE DONNÉES SIMULÉES ---
+final List<ConfigBackup> _backups = [
+ConfigBackup("v2.4.1", "Aujourd'hui, 04:30", "Auto-GitOps", "Snapshot WORM automatique", false), // Simule une instabilité
+ConfigBackup("v2.4.0", "Hier, 14:15", "Admin (John)", "Correction BGP Route Leaks", true),
+ConfigBackup("v2.3.9", "20 Août 2026", "SuperAdmin", "Mise à jour Firmware Core", true),
+];
 
-  @override
-  void initState() {
-    super.initState();
-    // Polling sécurisé avec vérification du montage
-    _telemetryTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _cpuUsage = 40.0 + (DateTime.now().millisecond % 20);
-        _tempCelsius = 60.0 + (DateTime.now().millisecond % 5);
-      });
-    });
-  }
+final List<MaintenanceTask> _tasks = [
+MaintenanceTask("Remplacement Switch Core-1", "Demain, 02:00 AM", "Planifié"),
+MaintenanceTask("Rotation des clés IPsec", "Dimanche, 00:00", "En attente d'approbation"),
+];
 
-  @override
-  void dispose() {
-    _telemetryTimer.cancel();
-    super.dispose();
-  }
+final List<SystemLog> _logs = [
+SystemLog("LOG-992", "10:45:01", "Port ETH-4 Flapping détecté (Hardware)", true),
+SystemLog("LOG-991", "10:40:00", "Note de Shift : Vérifier câble fibre optique Baie 2", false, editableNote: "Le technicien est en route. Attente de confirmation."),
+SystemLog("LOG-990", "09:12:44", "Admin_John s'est connecté via SSH", true),
+];
 
-  // --- MOTEUR DE DIAGNOSTIC GLOBAL SÉCURISÉ ---
-  void _runFullDiagnostics() async {
-    if (_isRunningDiagnostics) return;
+@override
+void initState() {
+super.initState();
+_tabController = TabController(length: 5, vsync: this);
 
-    setState(() {
-      _isRunningDiagnostics = true;
-      _diagnosticProgress = 0.0;
-    });
+// Animation pour les alertes critiques
+_pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
 
-    try {
-      for (int i = 1; i <= 100; i++) {
-        await Future.delayed(const Duration(milliseconds: 30));
-        if (!mounted) return; // Sécurité anti-crash si l'écran est fermé
-        setState(() => _diagnosticProgress = i / 100);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isRunningDiagnostics = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.greenAccent,
-            content: Text(
-              "Diagnostic terminé : 0 erreur critique, 1 avertissement CRC.",
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  // --- ROLLBACK SÉCURISÉ AVEC VALIDATION ADMIN ---
-  void _rollbackConfig(ConfigBackup backup) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text("Confirmation de Sécurité", style: TextStyle(color: Colors.white)),
-        content: Text(
-          "Voulez-vous vraiment restaurer la version ${backup.id} ? Cette action modifiera la table de routage en production.",
-          style: const TextStyle(color: Colors.blueGrey),
-        ),
-        actions: [
-          TextButton(
-            child: const Text("Annuler", style: TextStyle(color: Colors.white70)),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text("Confirmer le Rollback", style: TextStyle(color: Colors.white)),
-            onPressed: () {
-              Navigator.of(context).pop();
-              _executeRollback(backup);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _executeRollback(ConfigBackup backup) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Restauration sécurisée de la version ${backup.id} en cours...")),
-    );
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        backgroundColor: Colors.purpleAccent,
-        content: Text("Réseau restauré et synchronisé avec succès !"),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Maintenance & SRE (NetOps)', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 8),
-              Text('Santé matérielle, sauvegardes et diagnostics prédictifs.', style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
-              const SizedBox(height: 32),
-
-              // 1. HEALTH DASHBOARD
-              const Text("Télémétrie Matérielle (Live)", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              LayoutBuilder(
-                  builder: (context, constraints) {
-                    bool isMobile = constraints.maxWidth < 600;
-                    return Flex(
-                      direction: isMobile ? Axis.vertical : Axis.horizontal,
-                      children: [
-                        Expanded(flex: isMobile ? 0 : 1, child: _buildTelemetryGauge("CPU", _cpuUsage, " %", Colors.cyanAccent)),
-                        if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
-                        Expanded(flex: isMobile ? 0 : 1, child: _buildTelemetryGauge("RAM (NVRAM)", _ramUsage, " %", Colors.purpleAccent)),
-                        if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
-                        Expanded(flex: isMobile ? 0 : 1, child: _buildTelemetryGauge("Température", _tempCelsius, " °C", _tempCelsius > 70 ? Colors.redAccent : Colors.orangeAccent)),
-                      ],
-                    );
-                  }
-              ),
-              const SizedBox(height: 32),
-
-              // 2. MAINTENANCE PRÉDICTIVE
-              const Text("AIOps - Maintenance Prédictive", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              _buildPredictiveAlert(),
-              const SizedBox(height: 32),
-
-              // 3. CONFIG VAULT
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Config Vault (GitOps)", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(CupertinoIcons.cloud_upload, color: Colors.cyanAccent, size: 16),
-                    label: const Text("Forcer Sauvegarde", style: TextStyle(color: Colors.cyanAccent)),
-                  )
-                ],
-              ),
-              const SizedBox(height: 16),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _backups.length,
-                itemBuilder: (context, index) => _buildBackupTile(_backups[index]),
-              ),
-              const SizedBox(height: 32),
-
-              // 4. MOTEUR DE DIAGNOSTIC
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(CupertinoIcons.waveform_path_ecg, color: Colors.greenAccent, size: 48),
-                    const SizedBox(height: 16),
-                    const Text("Diagnostic Réseau Approfondi", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text("Analyse des tables de routage, vérification SFP/Optique, et latence DNS.", textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey[400], fontSize: 12)),
-                    const SizedBox(height: 24),
-                    if (_isRunningDiagnostics) ...[
-                      LinearProgressIndicator(value: _diagnosticProgress, backgroundColor: Colors.white10, color: Colors.greenAccent, minHeight: 8, borderRadius: BorderRadius.circular(4)),
-                      const SizedBox(height: 8),
-                      Text("Analyse en cours... ${(_diagnosticProgress * 100).toInt()}%", style: const TextStyle(color: Colors.greenAccent, fontSize: 12)),
-                    ] else
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.greenAccent.withOpacity(0.2),
-                            foregroundColor: Colors.greenAccent,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            side: const BorderSide(color: Colors.greenAccent),
-                          ),
-                          onPressed: _runFullDiagnostics,
-                          child: const Text("Lancer le Scan de Maintenance", style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      )
-                  ],
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTelemetryGauge(String title, double value, String unit, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        children: [
-          Text(title, style: TextStyle(color: Colors.blueGrey[300], fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: CircularProgressIndicator(
-                  value: value / 100,
-                  strokeWidth: 8,
-                  backgroundColor: Colors.white.withOpacity(0.05),
-                  color: color,
-                  strokeCap: StrokeCap.round,
-                ),
-              ),
-              Text("${value.toInt()}$unit", style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPredictiveAlert() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.5)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.orangeAccent, size: 28),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Anomalie Optique (Port ETH-4)", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text("L'IA détecte une augmentation des erreurs CRC (Cyclic Redundancy Check) de 15% sur les 48 dernières heures. Remplacement du module SFP recommandé sous 7 jours.", style: TextStyle(color: Colors.orange[200], fontSize: 12)),
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackupTile(ConfigBackup backup) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(12)),
-            child: Icon(backup.isStable ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.exclamationmark_circle_fill, color: backup.isStable ? Colors.greenAccent : Colors.redAccent),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(backup.id, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(width: 8),
-                    Text("par ${backup.author}", style: TextStyle(color: Colors.blueGrey[400], fontSize: 10)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(backup.description, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 4),
-                Text(backup.timestamp, style: TextStyle(color: Colors.blueGrey[500], fontSize: 10)),
-              ],
-            ),
-          ),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.purpleAccent),
-              foregroundColor: Colors.purpleAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            icon: const Icon(CupertinoIcons.arrow_counterclockwise, size: 14),
-            label: const Text("Rollback", style: TextStyle(fontSize: 12)),
-            onPressed: () => _rollbackConfig(backup),
-          )
-        ],
-      ),
-    );
-  }
+// Polling Télémétrie Sécurisé
+_telemetryTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+if (!mounted) return;
+setState(() {
+_cpuUsage = 40.0 + (DateTime.now().millisecond % 20);
+// Simulation d'une surchauffe périodique pour déclencher l'alerte CRITICAL
+_tempCelsius = timer.tick % 10 == 0 ? 82.0 : 60.0 + (DateTime.now().millisecond % 5);
+});
+});
 }
+
+@override
+void dispose() {
+_telemetryTimer.cancel();
+_pulseController.dispose();
+_tabController.dispose();
+super.dispose();
+}
+
+// ==========================================
+// LOGIQUE MÉTIER (DevSecOps)
+// ==========================================
+void _runFullDiagnostics() async {
+if (_isRunningDiagnostics) return;
+setState(() {
+_isRunningDiagnostics = true;
+_diagnosticProgress = 0.0;
+_diagnosticAlert = null;
+});
+
+try {
+for (int i = 1; i <= 100; i++) {
+await Future.delayed(const Duration(milliseconds: 20));
+if (!mounted) return;
+setState(() => _diagnosticProgress = i / 100);
+}
+} finally {
+if (mounted) {
+setState(() {
+_isRunningDiagnostics = false;
+_diagnosticAlert = "Latence BGP détectée sur le lien WAN-2 (Jitter: 45ms).";
+});
+}
+}
+}
+
+void _executeRollback(ConfigBackup backup) async {
+ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Application de la config ${backup.id} en cours...")));
+await Future.delayed(const Duration(seconds: 2));
+if (!mounted) return;
+ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.purpleAccent, content: Text("Réseau restauré avec succès !")));
+}
+
+// ==========================================
+// SYSTÈME DE NOTIFICATION UI/UX PREMIUM
+// ==========================================
+Widget _buildCyberAlertBanner(String title, String message, AlertSeverity severity) {
+Color accentColor;
+IconData icon;
+bool isPulsing = false;
+
+switch (severity) {
+case AlertSeverity.critical:
+accentColor = const Color(0xFFFF2A55); // Rouge Néon
+icon = CupertinoIcons.exclamationmark_triangle_fill;
+isPulsing = true;
+break;
+case AlertSeverity.warning:
+accentColor = Colors.orangeAccent;
+icon = CupertinoIcons.exclamationmark_shield_fill;
+break;
+case AlertSeverity.info:
+default:
+accentColor = const Color(0xFF00E5FF); // Cyan
+icon = CupertinoIcons.info_circle_fill;
+}
+
+Widget alertContent = Container(
+margin: const EdgeInsets.only(bottom: 24),
+padding: const EdgeInsets.all(16),
+decoration: BoxDecoration(
+color: const Color(0xFF131C2D),
+borderRadius: BorderRadius.circular(12),
+border: Border(left: BorderSide(color: accentColor, width: 4)),
+boxShadow: isPulsing ? [BoxShadow(color: accentColor.withValues(alpha: 0.2), blurRadius: 15, spreadRadius: -2)] : [],
+),
+child: Row(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+Icon(icon, color: accentColor, size: 24),
+const SizedBox(width: 12),
+Expanded(
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+Text(title, style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+const SizedBox(height: 4),
+Text(message, style: TextStyle(color: Colors.blueGrey[300], fontSize: 11, height: 1.4)),
+],
+),
+),
+if (severity != AlertSeverity.info)
+IconButton(
+icon: const Icon(CupertinoIcons.clear_circled, size: 16, color: Colors.blueGrey),
+onPressed: () {}, // Simule l'acquittement de l'alerte
+padding: EdgeInsets.zero,
+constraints: const BoxConstraints(),
+)
+],
+),
+);
+
+if (isPulsing) {
+return AnimatedBuilder(
+animation: _pulseController,
+builder: (context, child) {
+return Transform.scale(
+scale: 1.0 + (_pulseController.value * 0.01), // Micro-pulsation UI
+child: alertContent,
+);
+}
+);
+}
+return alertContent;
+}
+
+// ==========================================
+// STRUCTURE PRINCIPALE DE L'INTERFACE
+// ==========================================
+@override
+Widget build(BuildContext context) {
+return Scaffold(
+backgroundColor: const Color(0xFF070B14),
+appBar: AppBar(
+backgroundColor: const Color(0xFF070B14),
+elevation: 0,
+title: const Text('Centre SRE & Opérations IT', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+bottom: TabBar(
+controller: _tabController,
+isScrollable: true,
+indicatorColor: const Color(0xFF00E5FF),
+labelColor: const Color(0xFF00E5FF),
+unselectedLabelColor: Colors.blueGrey[600],
+labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+tabs: const [
+Tab(icon: Icon(CupertinoIcons.speedometer, size: 18), text: "Télémétrie"),
+Tab(icon: Icon(CupertinoIcons.archivebox_fill, size: 18), text: "Config Vault"),
+Tab(icon: Icon(CupertinoIcons.waveform_path_ecg, size: 18), text: "Diagnostics"),
+Tab(icon: Icon(CupertinoIcons.calendar, size: 18), text: "Planification"),
+Tab(icon: Icon(CupertinoIcons.doc_text_fill, size: 18), text: "Audit Logs"),
+],
+),
+),
+body: SafeArea(
+child: TabBarView(
+controller: _tabController,
+children: [
+_buildTelemetryTab(),
+_buildConfigVaultTab(),
+_buildDiagnosticsTab(),
+_buildSchedulerTab(),
+_buildLogsTab(),
+],
+),
+),
+);
+}
+
+// ==========================================
+// ONGLET 1 : TÉLÉMÉTRIE
+// ==========================================
+Widget _buildTelemetryTab() {
+bool isOverheating = _tempCelsius >= 75.0;
+
+return SingleChildScrollView(
+physics: const BouncingScrollPhysics(),
+padding: const EdgeInsets.all(24),
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+// NOTIFICATION INTÉGRÉE (Contextuelle)
+if (isOverheating)
+_buildCyberAlertBanner("ALERTE THERMIQUE MATÉRIELLE", "La température du CPU principal dépasse le seuil critique (75°C). Risque de Thermal Throttling imminent.", AlertSeverity.critical)
+else if (_isVastAiActive)
+_buildCyberAlertBanner("AIOps ACTIF", "L'analyse prédictive est déléguée à l'instance Cloud Vast.ai.", AlertSeverity.info),
+
+const Text("Santé Matérielle (Live)", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+const SizedBox(height: 16),
+LayoutBuilder(
+builder: (context, constraints) {
+bool isMobile = constraints.maxWidth < 600;
+return Flex(
+direction: isMobile ? Axis.vertical : Axis.horizontal,
+children: [
+Expanded(flex: isMobile ? 0 : 1, child: _buildGauge("CPU", _cpuUsage, "%", Colors.cyanAccent)),
+if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
+Expanded(flex: isMobile ? 0 : 1, child: _buildGauge("NVRAM", _ramUsage, "%", Colors.purpleAccent)),
+if (isMobile) const SizedBox(height: 16) else const SizedBox(width: 16),
+Expanded(flex: isMobile ? 0 : 1, child: _buildGauge("Température", _tempCelsius, "°C", isOverheating ? const Color(0xFFFF2A55) : Colors.orangeAccent)),
+],
+);
+}
+),
+const SizedBox(height: 32),
+
+// VAST.AI INTEGRATION
+Row(
+mainAxisAlignment: MainAxisAlignment.spaceBetween,
+children: [
+const Text("AIOps & Vast.ai Integration", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+CupertinoSwitch(
+value: _isVastAiActive,
+activeColor: const Color(0xFF8B5CF6),
+onChanged: (val) => setState(() => _isVastAiActive = val)
+),
+],
+),
+const SizedBox(height: 12),
+Container(
+padding: const EdgeInsets.all(16),
+decoration: BoxDecoration(color: const Color(0xFF131C2D), borderRadius: BorderRadius.circular(16), border: Border.all(color: _isVastAiActive ? const Color(0xFF8B5CF6) : Colors.white10)),
+child: Text(_isVastAiActive ? "Délégation Cloud Active : Analyse des logs par IA en cours." : "AIOps désactivé. Analyse matérielle locale uniquement.", style: TextStyle(color: Colors.blueGrey[300], fontSize: 12)),
+)
+],
+),
+);
+}
+
+Widget _buildGauge(String title, double value, String unit, Color color) {
+return Container(
+padding: const EdgeInsets.all(20),
+decoration: BoxDecoration(color: const Color(0xFF131C2D), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+child: Column(
+children: [
+Text(title, style: TextStyle(color: Colors.blueGrey[300], fontSize: 13, fontWeight: FontWeight.bold)),
+const SizedBox(height: 16),
+Stack(
+alignment: Alignment.center,
+children: [
+SizedBox(width: 70, height: 70, child: CircularProgressIndicator(value: value / 100, strokeWidth: 6, backgroundColor: Colors.white.withValues(alpha: 0.05), color: color, strokeCap: StrokeCap.round)),
+Text("${value.toInt()}$unit", style: GoogleFonts.jetbrainsMono(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+],
+),
+],
+),
+);
+}
+
+// ==========================================
+// ONGLET 2 : CONFIG VAULT (GITOPS)
+// ==========================================
+Widget _buildConfigVaultTab() {
+bool hasUnstableConfig = _backups.any((b) => !b.isStable);
+
+return ListView.builder(
+physics: const BouncingScrollPhysics(),
+padding: const EdgeInsets.all(24),
+itemCount: _backups.length + 1,
+itemBuilder: (context, index) {
+if (index == 0) {
+return Column(
+children: [
+// NOTIFICATION INTÉGRÉE
+if (hasUnstableConfig)
+_buildCyberAlertBanner("DÉRIVE DE CONFIGURATION", "Le dernier Snapshot (v2.4.1) est marqué comme instable. Un Rollback est fortement recommandé.", AlertSeverity.warning),
+
+Padding(
+padding: const EdgeInsets.only(bottom: 24.0),
+child: Row(
+mainAxisAlignment: MainAxisAlignment.spaceBetween,
+children: [
+const Text("Dépôt Sécurisé (GitOps)", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+ElevatedButton.icon(
+style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF131C2D), foregroundColor: const Color(0xFF00E5FF)),
+icon: const Icon(CupertinoIcons.cloud_upload, size: 16), label: const Text("Snapshot Manuel"), onPressed: () {},
+)
+],
+),
+),
+],
+);
+}
+final backup = _backups[index - 1];
+return Container(
+margin: const EdgeInsets.only(bottom: 12),
+padding: const EdgeInsets.all(16),
+decoration: BoxDecoration(
+color: const Color(0xFF131C2D),
+borderRadius: BorderRadius.circular(16),
+border: Border.all(color: !backup.isStable ? Colors.orangeAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05))
+),
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+Row(
+children: [
+Icon(backup.isStable ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.exclamationmark_circle_fill, color: backup.isStable ? Colors.greenAccent : Colors.orangeAccent, size: 20),
+const SizedBox(width: 12),
+Text(backup.id, style: GoogleFonts.jetbrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+const Spacer(),
+Text(backup.timestamp, style: TextStyle(color: Colors.blueGrey[500], fontSize: 10)),
+],
+),
+const SizedBox(height: 8),
+Text(backup.description, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+const SizedBox(height: 12),
+Row(
+children: [
+OutlinedButton.icon(
+style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.blueGrey), foregroundColor: Colors.blueGrey, minimumSize: const Size(0, 32)),
+icon: const Icon(CupertinoIcons.doc_text_search, size: 14), label: const Text("Voir le Diff", style: TextStyle(fontSize: 11)), onPressed: () {},
+),
+const SizedBox(width: 8),
+ElevatedButton.icon(
+style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF2A55).withValues(alpha: 0.2), foregroundColor: const Color(0xFFFF2A55), minimumSize: const Size(0, 32), elevation: 0),
+icon: const Icon(CupertinoIcons.arrow_counterclockwise, size: 14), label: const Text("Rollback", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+onPressed: () => _executeRollback(backup),
+)
+],
+)
+],
+),
+);
+},
+);
+}
+
+// ==========================================
+// ONGLET 3 : DIAGNOSTICS RÉSEAU
+// ==========================================
+Widget _buildDiagnosticsTab() {
+return SingleChildScrollView(
+physics: const BouncingScrollPhysics(),
+padding: const EdgeInsets.all(24),
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+// NOTIFICATION INTÉGRÉE
+if (_diagnosticAlert != null)
+_buildCyberAlertBanner("RÉSULTAT DU DIAGNOSTIC", _diagnosticAlert!, AlertSeverity.warning)
+else if (!_isRunningDiagnostics && _diagnosticAlert == null)
+_buildCyberAlertBanner("PRÊT POUR L'AUDIT", "Le moteur de diagnostic Deep-Dive est prêt à analyser les paquets.", AlertSeverity.info),
+
+Container(
+padding: const EdgeInsets.all(24),
+decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF131C2D), Color(0xFF070B14)]), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3))),
+child: Column(
+children: [
+const Icon(CupertinoIcons.waveform_path_ecg, color: Color(0xFF00E5FF), size: 40),
+const SizedBox(height: 16),
