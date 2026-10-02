@@ -416,7 +416,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                             children: [
                               _buildStatCard("Uptime Réseau", "99.98%", CupertinoIcons.timer, const Color(0xFF00E5FF)),
                               _buildStatCard("Menaces Isolées", "1,204", CupertinoIcons.shield_lefthalf_fill, const Color(0xFFFF2A55)),
-                              _buildStatCard("Nœuds Actifs", "42", CupertinoIcons.server_rack, const Color(0xFF8B5CF6)),
+                              _buildStatCard("Nœuds Actifs", "42", CupertinoIcons.device_desktop, const Color(0xFF8B5CF6)),
                             ],
                           );
                         }
@@ -463,7 +463,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(value, style: GoogleFonts.jetbrainsMono(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(value, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                 Text(title, style: TextStyle(color: Colors.blueGrey[400], fontSize: 11)),
               ],
             ),

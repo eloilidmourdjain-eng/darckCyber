@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -272,7 +272,7 @@ write memory
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF00E5FF).withOpacity(0.1) : const Color(0xFF1E293B),
+                          color: isSelected ? const Color(0xFF00E5FF).withValues(alpha: 0.1) : const Color(0xFF1E293B),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: isSelected ? const Color(0xFF00E5FF) : Colors.white10),
                         ),
@@ -335,7 +335,7 @@ write memory
                       _buildInputField("Adresse IP Locale", _ipController),
                       const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(color: Colors.white12)),
 
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text("Serveur DHCP", style: TextStyle(color: Colors.white70, fontSize: 13)), value: _enableDHCP, activeColor: const Color(0xFF00E5FF), onChanged: (val) => setState(() => _enableDHCP = val)),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text("Serveur DHCP", style: TextStyle(color: Colors.white70, fontSize: 13)), value: _enableDHCP, activeTrackColor: const Color(0xFF00E5FF), onChanged: (val) => setState(() => _enableDHCP = val)),
                       if (_enableDHCP) ...[
                         Row(
                           children: [
@@ -345,7 +345,7 @@ write memory
                           ],
                         ),
                       ],
-                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text("Serveurs DNS", style: TextStyle(color: Colors.white70, fontSize: 13)), value: _enableDNS, activeColor: const Color(0xFF00E5FF), onChanged: (val) => setState(() => _enableDNS = val)),
+                      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text("Serveurs DNS", style: TextStyle(color: Colors.white70, fontSize: 13)), value: _enableDNS, activeTrackColor: const Color(0xFF00E5FF), onChanged: (val) => setState(() => _enableDNS = val)),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity, height: 50,
@@ -367,7 +367,7 @@ write memory
                   child: Container(
                     height: isDesktop ? 600 : 400,
                     margin: EdgeInsets.only(top: isDesktop ? 0 : 24),
-                    decoration: BoxDecoration(color: const Color(0xFF000000), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF00E5FF).withOpacity(0.3))),
+                    decoration: BoxDecoration(color: const Color(0xFF000000), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3))),
                     child: Column(
                       children: [
                         Container(
@@ -395,7 +395,7 @@ write memory
                               controller: _scriptEditorController,
                               maxLines: null, // Permet un nombre de lignes infini (Editeur de code)
                               keyboardType: TextInputType.multiline,
-                              style: GoogleFonts.jetbrainsMono(color: const Color(0xFF00E5FF), fontSize: 13, height: 1.5),
+                              style: GoogleFonts.jetBrainsMono(color: const Color(0xFF00E5FF), fontSize: 13, height: 1.5),
                               decoration: const InputDecoration(border: InputBorder.none, isDense: true),
                             ),
                           ),
@@ -432,7 +432,7 @@ write memory
                 ],
               ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.withOpacity(0.2), foregroundColor: Colors.greenAccent, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.withValues(alpha: 0.2), foregroundColor: Colors.greenAccent, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
                 icon: _isSimulating ? const CupertinoActivityIndicator(color: Colors.greenAccent) : const Icon(CupertinoIcons.play_fill),
                 label: Text(_isSimulating ? "Simulation..." : "EXÉCUTER LE TEST", style: const TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: _isSimulating ? null : _runSimulation,
@@ -476,7 +476,7 @@ write memory
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6.0),
-                    child: Text(log, style: GoogleFonts.jetbrainsMono(color: logColor, fontSize: 13)),
+                    child: Text(log, style: GoogleFonts.jetBrainsMono(color: logColor, fontSize: 13)),
                   );
                 },
               ),
@@ -491,10 +491,10 @@ write memory
   Widget _buildTopologyNode(IconData icon, String label, Color color, {String? ip}) {
     return Column(
       children: [
-        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: color.withOpacity(0.5))), child: Icon(icon, color: color, size: 32)),
+        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.5))), child: Icon(icon, color: color, size: 32)),
         const SizedBox(height: 12),
         Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-        if (ip != null) Text(ip, style: GoogleFonts.jetbrainsMono(color: Colors.white54, fontSize: 10)),
+        if (ip != null) Text(ip, style: GoogleFonts.jetBrainsMono(color: Colors.white54, fontSize: 10)),
       ],
     );
   }
@@ -504,7 +504,7 @@ write memory
       child: Container(
         height: 2,
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        color: isActive ? Colors.greenAccent.withOpacity(0.5) : Colors.white10,
+        color: isActive ? Colors.greenAccent.withValues(alpha: 0.5) : Colors.white10,
         child: isActive ? const Center(child: Icon(CupertinoIcons.chevron_right, color: Colors.greenAccent, size: 12)) : null,
       ),
     );

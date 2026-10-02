@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:darck_puls/features/superAdmin/cyber_tools/widgets/defense_dashboard.dart';
@@ -79,9 +79,9 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: kBackgroundColor.withOpacity(0.9),
-        border: Border(bottom: BorderSide(color: kRootColor.withOpacity(0.2))),
-        boxShadow: [BoxShadow(color: kRootColor.withOpacity(0.1), blurRadius: 20)],
+        color: kBackgroundColor.withValues(alpha: 0.9),
+        border: Border(bottom: BorderSide(color: kRootColor.withValues(alpha: 0.2))),
+        boxShadow: [BoxShadow(color: kRootColor.withValues(alpha: 0.1), blurRadius: 20)],
       ),
       child: Row(
         children: [
@@ -92,7 +92,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
-                return Icon(CupertinoIcons.radiowaves_right, color: kRootColor.withOpacity(_pulseController.value), size: 24);
+                return Icon(CupertinoIcons.radiowaves_right, color: kRootColor.withValues(alpha: _pulseController.value), size: 24);
               }
           ),
           const SizedBox(width: 12),
@@ -112,9 +112,9 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -124,9 +124,9 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             controller: _tabController,
             isScrollable: true,
             indicator: BoxDecoration(
-              color: kRootColor.withOpacity(0.15),
+              color: kRootColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kRootColor.withOpacity(0.5)),
+              border: Border.all(color: kRootColor.withValues(alpha: 0.5)),
             ),
             labelColor: kRootColor,
             unselectedLabelColor: kTextSecondary,
@@ -158,7 +158,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange.withOpacity(0.3))),
+                  decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange.withValues(alpha: 0.3))),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -171,7 +171,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
                         ],
                       ),
                       CupertinoSwitch(
-                        activeColor: Colors.orange,
+                        activeTrackColor: Colors.orange,
                         value: _isN8nActive,
                         onChanged: (val) => setState(() => _isN8nActive = val),
                       ),
@@ -183,7 +183,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.3))),
+                  decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withValues(alpha: 0.3))),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -196,7 +196,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
                         ],
                       ),
                       CupertinoSwitch(
-                        activeColor: Colors.amber,
+                        activeTrackColor: Colors.amber,
                         value: _isVgpuBoostEnabled,
                         onChanged: (val) => setState(() => _isVgpuBoostEnabled = val),
                       ),
@@ -226,7 +226,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.pinkAccent.withOpacity(0.4)), boxShadow: [BoxShadow(color: Colors.pinkAccent.withOpacity(0.1), blurRadius: 20)]),
+            decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.pinkAccent.withValues(alpha: 0.4)), boxShadow: [BoxShadow(color: Colors.pinkAccent.withValues(alpha: 0.1), blurRadius: 20)]),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -244,7 +244,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
                     Text("4 Pièges Actifs : SSH Trap, FTP Fake...", style: TextStyle(color: Colors.white70, fontSize: 10)),
                   ],
                 ),
-                CupertinoSwitch(value: _isHoneypotDefenseArmed, activeColor: Colors.pinkAccent, onChanged: (val) => setState(() => _isHoneypotDefenseArmed = val)),
+                CupertinoSwitch(value: _isHoneypotDefenseArmed, activeTrackColor: Colors.pinkAccent, onChanged: (val) => setState(() => _isHoneypotDefenseArmed = val)),
               ],
             ),
           ),
@@ -268,7 +268,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: kRootColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: kRootColor.withOpacity(0.3))),
+            decoration: BoxDecoration(color: kRootColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: kRootColor.withValues(alpha: 0.3))),
             child:  Row(
               children: [
                 Icon(CupertinoIcons.exclamationmark_triangle_fill, color: kRootColor, size: 20),

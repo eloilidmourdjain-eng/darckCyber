@@ -670,8 +670,8 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                       min: 10.0,
                       max: 1000.0,
                       divisions: 20,
-                      activeColor: Colors.purple,
-                      inactiveColor: kBackgroundColor,
+                      activeTrackColor: Colors.purple,
+                      inactiveTrackColor: kBackgroundColor,
                       label: "${_sharedBandwidthLimitMbps.toStringAsFixed(0)} Mbps",
                       onChanged: (val) {
                         setState(() {

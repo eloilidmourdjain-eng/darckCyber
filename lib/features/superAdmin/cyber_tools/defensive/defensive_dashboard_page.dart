@@ -217,7 +217,7 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
                   const Text("SOC (Security Operations)", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: _isConnected ? Colors.greenAccent.withOpacity(0.1) : Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    decoration: BoxDecoration(color: _isConnected ? Colors.greenAccent.withValues(alpha: 0.1) : Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                     child: Row(
                       children: [
                         Icon(CupertinoIcons.circle_fill, color: _isConnected ? Colors.greenAccent : Colors.redAccent, size: 10),
@@ -237,7 +237,7 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.redAccent.withOpacity(0.05), blurRadius: 20)],
+                  boxShadow: [BoxShadow(color: Colors.redAccent.withValues(alpha: 0.05), blurRadius: 20)],
                 ),
                 child: LineChart(
                   LineChartData(
@@ -256,7 +256,7 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
                         belowBarData: BarAreaData(
                           show: true,
                           gradient: LinearGradient(
-                            colors: [Colors.redAccent.withOpacity(0.4), Colors.transparent],
+                            colors: [Colors.redAccent.withValues(alpha: 0.4), Colors.transparent],
                             begin: Alignment.topCenter, end: Alignment.bottomCenter,
                           ),
                         ),
@@ -299,14 +299,14 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E293B),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: color.withOpacity(0.3)),
-                        boxShadow: isCritical ? [BoxShadow(color: Colors.redAccent.withOpacity(0.1), blurRadius: 10)] : [],
+                        border: Border.all(color: color.withValues(alpha: 0.3)),
+                        boxShadow: isCritical ? [BoxShadow(color: Colors.redAccent.withValues(alpha: 0.1), blurRadius: 10)] : [],
                       ),
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
                             child: Icon(isCritical ? CupertinoIcons.flame_fill : CupertinoIcons.shield_fill, color: color, size: 20),
                           ),
                           const SizedBox(width: 16),
@@ -323,7 +323,7 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
                           if (isCritical || alert['severity'] == 'WARNING')
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: color.withOpacity(0.1),
+                                backgroundColor: color.withValues(alpha: 0.1),
                                 foregroundColor: color,
                                 elevation: 0,
                                 side: BorderSide(color: color),
@@ -352,7 +352,7 @@ class _OperationalDefenseDashboardState extends State<OperationalDefenseDashboar
       child: FilterChip(
         showCheckmark: false,
         backgroundColor: const Color(0xFF1E293B),
-        selectedColor: color.withOpacity(0.2),
+        selectedColor: color.withValues(alpha: 0.2),
         side: BorderSide(color: isSelected ? color : Colors.transparent),
         label: Row(
           children: [

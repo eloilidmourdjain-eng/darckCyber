@@ -346,7 +346,7 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(node.id, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                          Text(node.ip, style: GoogleFonts.jetbrainsMono(color: Colors.blueGrey[300], fontSize: 12)),
+                          Text(node.ip, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[300], fontSize: 12)),
                         ],
                       ),
                     ],
@@ -406,7 +406,7 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
         children: [
           const CircularProgressIndicator(color: Color(0xFF00E5FF)),
           const SizedBox(height: 20),
-          Text("Injection des règles réseaux (API Controller)...", style: GoogleFonts.jetbrainsMono(color: const Color(0xFF00E5FF), fontSize: 12)),
+          Text("Injection des règles réseaux (API Controller)...", style: GoogleFonts.jetBrainsMono(color: const Color(0xFF00E5FF), fontSize: 12)),
         ],
       ),
     );
@@ -431,7 +431,7 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
   Widget _buildMiniMetric(String label, String value, Color color) {
     return Column(
       children: [
-        Text(value, style: GoogleFonts.jetbrainsMono(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(value, style: GoogleFonts.jetBrainsMono(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(color: Colors.blueGrey[400], fontSize: 10)),
       ],
@@ -480,8 +480,8 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(report.id, style: GoogleFonts.jetbrainsMono(color: kCyan, fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text(report.timestamp, style: GoogleFonts.jetbrainsMono(color: Colors.blueGrey[500], fontSize: 10)),
+                        Text(report.id, style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text(report.timestamp, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[500], fontSize: 10)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -515,27 +515,88 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
 // MOTEUR GRAPHIQUE (Optimisé Flutter 3.24)
 // ==========================================
 class NetworkTopologyPainter extends CustomPainter {
-final List<TopologyNode> nodes;
-final List<TopologyEdge> edges;
-final double animationValue;
+  final List<TopologyNode> nodes;
+  final List<TopologyEdge> edges;
+  final double animationValue;
 
-NetworkTopologyPainter(this.nodes, this.edges, this.animationValue);
+  NetworkTopologyPainter(this.nodes, this.edges, this.animationValue);
 
-@override
-void paint(Canvas canvas, Size size) {
-canvas.translate(size.width / 2, size.height / 2);
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.translate(size.width / 2, size.height / 2);
 
-for (var edge in edges) {
-bool isCritical = edge.target.aiAnomalyScore > 0.8;
-bool isWarning = edge.target.aiAnomalyScore > 0.5 && edge.target.aiAnomalyScore <= 0.8;
+    for (var edge in edges) {
+      bool isCritical = edge.target.aiAnomalyScore > 0.8;
+      bool isWarning = edge.target.aiAnomalyScore > 0.5 && edge.target.aiAnomalyScore <= 0.8;
 
-Color lineColor = isCritical ? const Color(0xFFFF2A55) : (isWarning ? Colors.orangeAccent : const Color(0xFF00E5FF));
+      Color lineColor = isCritical ? const Color(0xFFFF2A55) : (isWarning ? Colors.orangeAccent : const Color(0xFF00E5FF));
 
-final paintLine = Paint()
-..color = lineColor.withValues(alpha: 0.3)
-..strokeWidth = 2.0
-..style = PaintingStyle.stroke;
-canvas.drawLine(edge.source.position, edge.target.position, paintLine);
+      final paintLine = Paint()
+        ..color = lineColor.withValues(alpha: 0.3)
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(edge.source.position, edge.target.position, paintLine);
 
-double progress = (animationValue + edge.bandwidthUsage) % 1.0;
-double packetX = edge.source.position.dx + (edge.target.position.dx - edge.source.position.dx) * progress;
+      double progress = (animationValue + edge.bandwidthUsage) % 1.0;
+      double packetX = edge.source.position.dx + (edge.target.position.dx - edge.source.position.dx) * progress;
+      double packetY = edge.source.position.dy + (edge.target.position.dy - edge.source.position.dy) * progress;
+
+      final paintPacket = Paint()
+        ..color = lineColor
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+      canvas.drawCircle(Offset(packetX, packetY), 3.5, paintPacket);
+    }
+
+    for (var node in nodes) {
+      Color nodeColor = const Color(0xFF00E5FF);
+      if (node.aiAnomalyScore > 0.8) nodeColor = const Color(0xFFFF2A55);
+      else if (node.aiAnomalyScore > 0.5) nodeColor = Colors.orangeAccent;
+
+      double nodeRadius = node.type == NodeType.router ? 32.0 : 22.0;
+
+      final paintGlow = Paint()
+        ..color = nodeColor.withValues(alpha: 0.25)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, node.aiAnomalyScore > 0.5 ? 16.0 : 8.0);
+      canvas.drawCircle(node.position, nodeRadius + 8, paintGlow);
+
+      final paintNode = Paint()..color = const Color(0xFF131C2D);
+      final paintBorder = Paint()
+        ..color = nodeColor
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawCircle(node.position, nodeRadius, paintNode);
+      canvas.drawCircle(node.position, nodeRadius, paintBorder);
+
+      IconData icon;
+      switch (node.type) {
+        case NodeType.router: icon = CupertinoIcons.rocket_fill; break;
+        case NodeType.server: icon = Icons.dns; break;
+        case NodeType.mobile: icon = CupertinoIcons.device_phone_portrait; break;
+        case NodeType.iot: icon = CupertinoIcons.video_camera; break;
+        case NodeType.pc: default: icon = CupertinoIcons.device_desktop; break;
+      }
+
+      TextPainter textPainter = TextPainter(
+        text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: nodeRadius * 0.8, fontFamily: icon.fontFamily, package: icon.fontPackage, color: Colors.white)),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(node.position.dx - (textPainter.width / 2), node.position.dy - (textPainter.height / 2)));
+
+      TextPainter labelPainter = TextPainter(
+        text: TextSpan(
+          text: "${node.id}\n${node.ip}",
+          style: GoogleFonts.jetBrainsMono(color: Colors.white70, fontSize: 10, height: 1.2),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      labelPainter.layout();
+      labelPainter.paint(canvas, Offset(node.position.dx - (labelPainter.width / 2), node.position.dy + nodeRadius + 8));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant NetworkTopologyPainter oldDelegate) => oldDelegate.animationValue != animationValue;
+}

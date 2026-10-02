@@ -323,8 +323,8 @@ class _SecurityAlertsScreenState extends State<SecurityAlertsScreen> with Ticker
                             children: [
                               Text("Routeur Core (L3)", style: TextStyle(color: Colors.blueGrey[300], fontSize: 14)),
                               const SizedBox(height: 8),
-                              Text("192.168.1.1", style: GoogleFonts.jetbrainsMono(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                              Text(_gatewayMacDisplay, style: GoogleFonts.jetbrainsMono(color: Colors.white54, fontSize: 12)),
+                              Text("192.168.1.1", style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                              Text(_gatewayMacDisplay, style: GoogleFonts.jetBrainsMono(color: Colors.white54, fontSize: 12)),
                             ],
                           ),
                         ),
@@ -446,7 +446,7 @@ class _SecurityAlertsScreenState extends State<SecurityAlertsScreen> with Ticker
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(device.ip, style: GoogleFonts.jetbrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(device.ip, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 4),
                     Text("${device.mac} • ${device.os}", style: TextStyle(color: Colors.blueGrey[400], fontSize: 11)),
                   ],
@@ -482,7 +482,7 @@ class _SecurityAlertsScreenState extends State<SecurityAlertsScreen> with Ticker
         return TimelineTile(
           isFirst: index == 0,
           isLast: index == _logs.length - 1,
-          beforeLineStyle: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 2),
+          beforeLineStyle: LineStyle(color: Colors.white.withValues(alpha: 0.1), thickness: 2),
           indicatorStyle: IndicatorStyle(
             width: 30, height: 30,
             indicator: Container(
@@ -501,7 +501,7 @@ class _SecurityAlertsScreenState extends State<SecurityAlertsScreen> with Ticker
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(event.title, style: TextStyle(color: indicatorColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text("${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}", style: GoogleFonts.jetbrainsMono(color: Colors.white54, fontSize: 10)),
+                    Text("${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}", style: GoogleFonts.jetBrainsMono(color: Colors.white54, fontSize: 10)),
                   ],
                 ),
                 const SizedBox(height: 8),

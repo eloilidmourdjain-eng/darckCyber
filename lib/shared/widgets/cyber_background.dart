@@ -80,7 +80,7 @@ class CyberPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
     final linePaint = Paint()
-      ..color = Colors.cyanAccent.withOpacity(0.1)
+      ..color = Colors.cyanAccent.withValues(alpha: 0.1)
       ..strokeWidth = 1.0;
 
     // Rendu géométrique optimisé
@@ -93,7 +93,7 @@ class CyberPainter extends CustomPainter {
 
       // Dessin d'un nœud lumineux de grille cyber
       final particlePaint = Paint()
-        ..color = Colors.cyanAccent.withOpacity(particle.opacity)
+        ..color = Colors.cyanAccent.withValues(alpha: particle.opacity)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
 
       canvas.drawCircle(Offset(px, py), 2.0, particlePaint);

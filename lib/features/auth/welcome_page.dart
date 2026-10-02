@@ -60,14 +60,14 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
             top: -150, left: -100,
             child: Container(
               width: 400, height: 400,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: kAccentCyan.withOpacity(0.15)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: kAccentCyan.withValues(alpha: 0.15)),
             ),
           ),
           Positioned(
             bottom: -150, right: -100,
             child: Container(
               width: 400, height: 400,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: kAccentPurple.withOpacity(0.15)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: kAccentPurple.withValues(alpha: 0.15)),
             ),
           ),
           // Filtre de flou global pour le fond
@@ -88,12 +88,12 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                     child: Container(
                       constraints: const BoxConstraints(maxWidth: 500), // Optimisé pour tablette/PC aussi
                       decoration: BoxDecoration(
-                        color: kCardBackground.withOpacity(0.6),
+                        color: kCardBackground.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withOpacity(0.08), width: 1.5),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 1.5),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 40, offset: const Offset(0, 20)),
-                          BoxShadow(color: kAccentCyan.withOpacity(0.05), blurRadius: 20, spreadRadius: -5), // Glow externe
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 40, offset: const Offset(0, 20)),
+                          BoxShadow(color: kAccentCyan.withValues(alpha: 0.05), blurRadius: 20, spreadRadius: -5), // Glow externe
                         ],
                       ),
                       child: ClipRRect(
@@ -126,8 +126,8 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                   padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white.withOpacity(0.02),
-                                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                                    color: Colors.white.withValues(alpha: 0.02),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                                   ),
                                   child: Image.asset(
                                     'assets/logo.png',
@@ -212,8 +212,8 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
       height: 55,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(colors: [kAccentCyan.withOpacity(0.8), const Color(0xFF1E3A8A)], begin: Alignment.centerLeft, end: Alignment.centerRight),
-        boxShadow: [BoxShadow(color: kAccentCyan.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
+        gradient: LinearGradient(colors: [kAccentCyan.withValues(alpha: 0.8), const Color(0xFF1E3A8A)], begin: Alignment.centerLeft, end: Alignment.centerRight),
+        boxShadow: [BoxShadow(color: kAccentCyan.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 5))],
       ),
       child: Material(
         color: Colors.transparent,
@@ -247,8 +247,8 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
             width: 8, height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.orangeAccent.withOpacity(0.5 + (_pulseController.value * 0.5)),
-              boxShadow: [BoxShadow(color: Colors.orangeAccent.withOpacity(_pulseController.value * 0.8), blurRadius: 6)],
+              color: Colors.orangeAccent.withValues(alpha: 0.5 + (_pulseController.value * 0.5)),
+              boxShadow: [BoxShadow(color: Colors.orangeAccent.withValues(alpha: _pulseController.value * 0.8), blurRadius: 6)],
             ),
           );
         }

@@ -132,10 +132,7 @@ class _WifiAnalyzerScreenState extends State<WifiAnalyzerScreen> {
 
       setState(() {
         // Mapping des résultats Desktop vers l'objet WiFiAccessPoint pour l'UI
-        _accessPoints = desktopNetworks.map((net) => WiFiAccessPoint(
-          ssid: net.ssid, bssid: net.bssid, level: net.rssi, frequency: net.frequency,
-          capabilities: '', centerFrequency0: 0, centerFrequency1: 0, channelWidth: 0, standard: WiFiStandard.unknown, timestamp: 0, venueName: '', is80211mcResponder: false, isPasspoint: false,
-        )).toList();
+
 
         double bestSignal = _accessPoints.isNotEmpty ? _accessPoints.first.level.toDouble() : -100.0;
         _updateLiveChartOptimized(bestSignal);
@@ -327,7 +324,7 @@ class _WifiAnalyzerScreenState extends State<WifiAnalyzerScreen> {
             child: const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.redAccent, size: 40),
           ),
           const SizedBox(height: 16),
-          Text("ACCÈS MATÉRIEL REFUSÉ", style: GoogleFonts.jetbrainsMono(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+          Text("ACCÈS MATÉRIEL REFUSÉ", style: GoogleFonts.jetBrainsMono(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Text(_errorMessage, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey[300], fontSize: 12)),
         ],
@@ -391,7 +388,7 @@ class _WifiAnalyzerScreenState extends State<WifiAnalyzerScreen> {
               children: [
                 Text(ssid, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 4),
-                Text(bssid, style: GoogleFonts.jetbrainsMono(color: Colors.blueGrey[400], fontSize: 10)),
+                Text(bssid, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[400], fontSize: 10)),
               ],
             ),
           ),

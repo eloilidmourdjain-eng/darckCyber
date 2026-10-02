@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -172,7 +172,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: client.isBlocked ? Colors.redAccent.withOpacity(0.5) : Colors.white10),
+        border: Border.all(color: client.isBlocked ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +228,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
                 activeTrackColor: const Color(0xFF3B82F6),
                 inactiveTrackColor: Colors.white10,
                 thumbColor: Colors.cyanAccent,
-                overlayColor: Colors.cyanAccent.withOpacity(0.2),
+                overlayColor: Colors.cyanAccent.withValues(alpha: 0.2),
                 trackHeight: 4,
               ),
               child: Slider(
@@ -255,7 +255,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
           ] else ...[
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
               child: const Row(
                 children: [
                   Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.redAccent, size: 16),
@@ -293,7 +293,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
                     const Text("Activer Bande 5GHz (Haute Perf.)", style: TextStyle(color: Colors.white70)),
                     Switch(
                       value: _is5GHzEnabled,
-                      activeColor: Colors.purpleAccent,
+                      activeTrackColor: Colors.purpleAccent,
                       onChanged: (val) => setState(() => _is5GHzEnabled = val),
                     ),
                   ],
