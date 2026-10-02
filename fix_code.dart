@@ -1,65 +1,55 @@
 import 'dart:io';
 
 void main() {
-  // Le dossier qui contient tout ton code source
   final dir = Directory('lib');
+  final backendDir = Directory('backend'); // Si tu as un dossier backend
 
-  if (!dir.existsSync()) {
-    print("❌ Erreur : Le dossier 'lib' n'existe pas. Placez-vous à la racine du projet.");
-    return;
-  }
+  int printCount = 0;
+  int switchCount = 0;
 
-  int fileCount = 0;
-  int opacityCount = 0;
-  int fontCount = 0;
+  print("🚀 Démarrage du script de nettoyage final...");
 
-  print("🚀 Démarrage du script de nettoyage DevSecOps...\n");
+  void processDirectory(Directory directory) {
+    if (!directory.existsSync()) return;
 
-  // Parcours récursif de tous les fichiers du projet
-  for (var entity in dir.listSync(recursive: true)) {
-    if (entity is File && entity.path.endsWith('.dart')) {
-      String content = entity.readAsStringSync();
-      bool modified = false;
+    for (var entity in directory.listSync(recursive: true)) {
+      if (entity is File && entity.path.endsWith('.dart')) {
+        String content = entity.readAsStringSync();
+        bool modified = false;
 
-      // 1. Correction globale de withOpacity -> withValues(alpha: )
-      if (content.contains('.withOpacity(')) {
-        opacityCount += '#'.allMatches(content.replaceAll('.withOpacity(', '#')).length;
-        content = content.replaceAll('.withOpacity(', '.withValues(alpha: ');
-        modified = true;
-      }
+        // 1. Remplacer print() par debugPrint() (Norme de production)
+        // On s'assure d'abord que le fichier importe foundation.dart
+        if (content.contains('print(') && !content.contains("import 'package:flutter/foundation.dart';")) {
+          content = "import 'package:flutter/foundation.dart';\n" + content;
+        }
+        if (content.contains('print(')) {
+          printCount += '#'.allMatches(content.replaceAll('print(', '#')).length;
+          content = content.replaceAll('print(', 'debugPrint(');
+          modified = true;
+        }
 
-      // 2. Correction de la typographie jetbrainsMono -> jetBrainsMono
-      if (content.contains('GoogleFonts.jetbrainsMono')) {
-        fontCount += '#'.allMatches(content.replaceAll('GoogleFonts.jetbrainsMono', '#')).length;
-        content = content.replaceAll('GoogleFonts.jetbrainsMono', 'GoogleFonts.jetBrainsMono');
-        modified = true;
-      }
+        // 2. Correction du switch (unreachable_switch_default)
+        if (content.contains('case NodeType.pc: default: icon =')) {
+          content = content.replaceAll('case NodeType.pc: default: icon =', 'case NodeType.pc: icon =');
+          switchCount++;
+          modified = true;
+        }
 
-      // 3. Correction de l'icône serveur inexistante chez Apple
-      if (content.contains('CupertinoIcons.server_rack')) {
-        content = content.replaceAll('CupertinoIcons.server_rack', 'Icons.dns');
-        modified = true;
-      }
-
-      // 4. Correction de activeColor obsolète pour les Switchs
-      if (content.contains('activeColor:')) {
-        content = content.replaceAll('activeColor:', 'activeTrackColor:');
-        modified = true;
-      }
-
-      // 5. Sauvegarde si le fichier a été touché
-      if (modified) {
-        entity.writeAsStringSync(content);
-        print("✔️ Mis à jour : ${entity.path}");
-        fileCount++;
+        // Sauvegarde
+        if (modified) {
+          entity.writeAsStringSync(content);
+          print("✔️ Nettoyé : ${entity.path}");
+        }
       }
     }
   }
 
+  processDirectory(dir);
+  processDirectory(backendDir);
+
   print("\n=====================================================");
-  print("🎉 NETTOYAGE TERMINÉ AVEC SUCCÈS !");
-  print("📂 Fichiers modifiés : $fileCount");
-  print("💧 Remplacements 'withOpacity' : $opacityCount");
-  print("✍️ Remplacements 'GoogleFonts' : $fontCount");
+  print("🎉 NETTOYAGE EXPERT TERMINÉ !");
+  print("🤫 'print' sécurisés en 'debugPrint' : $printCount");
+  print("🧹 'default' inutiles supprimés : $switchCount");
   print("=====================================================\n");
 }

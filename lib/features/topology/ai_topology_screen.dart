@@ -1,4 +1,4 @@
-﻿import 'dart:math';
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -574,7 +574,7 @@ class NetworkTopologyPainter extends CustomPainter {
         case NodeType.server: icon = Icons.dns; break;
         case NodeType.mobile: icon = CupertinoIcons.device_phone_portrait; break;
         case NodeType.iot: icon = CupertinoIcons.video_camera; break;
-        case NodeType.pc: default: icon = CupertinoIcons.device_desktop; break;
+        case NodeType.pc: icon = CupertinoIcons.device_desktop; break;
       }
 
       TextPainter textPainter = TextPainter(

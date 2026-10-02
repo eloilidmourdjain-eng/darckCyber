@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 class DesktopWifiNetwork {
@@ -23,7 +24,7 @@ class DesktopWifiScanner {
         networks = await _scanMacOS();
       }
     } catch (e) {
-      print("Erreur du scan Wi-Fi Desktop : $e");
+      debugPrint("Erreur du scan Wi-Fi Desktop : $e");
     }
 
     // Tri par puissance de signal (le plus fort en premier)

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,7 +12,7 @@ void main() async {
 
   var handler = webSocketHandler((WebSocketChannel webSocket) {
     clients.add(webSocket);
-    print("🔌 Nouvelle liaison sécurisée établie avec un client dashboard.");
+    debugPrint("🔌 Nouvelle liaison sécurisée établie avec un client dashboard.");
 
     // Écoute des messages entrants pour gérer la fermeture ou le ping/pong
     webSocket.stream.listen(
@@ -20,26 +21,26 @@ void main() async {
       },
       onDone: () {
         clients.remove(webSocket);
-        print("🔌 Déconnexion propre d'un client dashboard.");
+        debugPrint("🔌 Déconnexion propre d'un client dashboard.");
       },
       onError: (error) {
         clients.remove(webSocket);
-        print("⚠️ Erreur de socket client détectée : $error");
+        debugPrint("⚠️ Erreur de socket client détectée : $error");
       },
     );
   });
 
   // Démarrage sécurisé du serveur HTTP/WS sur l'interface locale ou durcie
   final server = await io.serve(handler, '0.0.0.0', 8080);
-  print('🚀 Serveur IDS Réel (Dark Pulse SecOps) actif sur le port ${server.port}');
+  debugPrint('🚀 Serveur IDS Réel (Dark Pulse SecOps) actif sur le port ${server.port}');
 
   // SÉCURITÉ : Vérification de l'existence du fichier de log avant de lancer le processus
   const logPath = '/var/log/auth.log';
   final logFile = File(logPath);
 
   if (!await logFile.exists()) {
-    print("❌ Avertissement critique : Le fichier de journalisation $logPath est introuvable.");
-    print("💡 Assurez-vous que rsyslog est actif ou ajustez la source vers journalctl.");
+    debugPrint("❌ Avertissement critique : Le fichier de journalisation $logPath est introuvable.");
+    debugPrint("💡 Assurez-vous que rsyslog est actif ou ajustez la source vers journalctl.");
     return;
   }
 
@@ -75,19 +76,19 @@ void main() async {
             try {
               client.sink.add(jsonString);
             } catch (e) {
-              print("❌ Échec d'envoi au client, suppression de la socket zombie : $e");
+              debugPrint("❌ Échec d'envoi au client, suppression de la socket zombie : $e");
               clients.remove(client);
               client.sink.close();
             }
           }
-          print("🚨 Menace Réelle isolée et diffusée : $attackerIp");
+          debugPrint("🚨 Menace Réelle isolée et diffusée : $attackerIp");
         }
       }
     }, onError: (err) {
-      print("❌ Erreur critique du processus tail : $err");
+      debugPrint("❌ Erreur critique du processus tail : $err");
     });
 
   } catch (e) {
-    print("❌ Impossible de démarrer le sous-système de surveillance des logs : $e");
+    debugPrint("❌ Impossible de démarrer le sous-système de surveillance des logs : $e");
   }
 }

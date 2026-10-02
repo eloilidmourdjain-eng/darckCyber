@@ -663,22 +663,21 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                         );
                       },
                     ),
-                    const Divider(color: Colors.white12, height: 20),
-                    Text("Bande passante maximale allouée : ${_sharedBandwidthLimitMbps.toStringAsFixed(0)} Mbps", style: const TextStyle(color: kTextSecondary, fontSize: 12)),
-                    Slider(
+                      const Divider(color: Colors.white12, height: 20),
+                      Text("Bande passante maximale allouée : ${_sharedBandwidthLimitMbps.toStringAsFixed(0)} Mbps", style: const TextStyle(color: kTextSecondary, fontSize: 12)),
+                      Slider(
                       value: _sharedBandwidthLimitMbps,
                       min: 10.0,
                       max: 1000.0,
                       divisions: 20,
-                      activeTrackColor: Colors.purple,
-                      inactiveTrackColor: kBackgroundColor,
+                      activeColor: Colors.cyanAccent,
                       label: "${_sharedBandwidthLimitMbps.toStringAsFixed(0)} Mbps",
                       onChanged: (val) {
-                        setState(() {
-                          _sharedBandwidthLimitMbps = val;
-                        });
+                      setState(() {
+                      _sharedBandwidthLimitMbps = val;
+                      });
                       },
-                    ),
+                      ),
                     const SizedBox(height: 10),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
