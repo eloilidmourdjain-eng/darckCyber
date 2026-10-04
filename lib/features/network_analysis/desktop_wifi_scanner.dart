@@ -51,7 +51,7 @@ class DesktopWifiScanner {
       } else if (line.startsWith("BSSID")) {
         String bssid = line.split(':').sublist(1).join(':').trim();
         // On récupère le signal (en pourcentage sous Windows)
-        int quality = 0;
+        
         int rssi = -100;
 
         // On doit extraire les lignes suivantes pour avoir le signal et la radio

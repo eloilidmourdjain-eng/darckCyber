@@ -2,54 +2,72 @@ import 'dart:io';
 
 void main() {
   final dir = Directory('lib');
-  final backendDir = Directory('backend'); // Si tu as un dossier backend
+  final backendDir = Directory('backend');
 
-  int printCount = 0;
-  int switchCount = 0;
+  if (!dir.existsSync()) {
+    print("❌ Dossier 'lib' introuvable.");
+    return;
+  }
 
-  print("🚀 Démarrage du script de nettoyage final...");
+  print("🚀 Démarrage du nettoyage chirurgical...");
 
-  void processDirectory(Directory directory) {
+  void cleanDirectory(Directory directory) {
     if (!directory.existsSync()) return;
 
-    for (var entity in directory.listSync(recursive: true)) {
-      if (entity is File && entity.path.endsWith('.dart')) {
-        String content = entity.readAsStringSync();
-        bool modified = false;
+    for (var file in directory.listSync(recursive: true).whereType<File>()) {
+      if (!file.path.endsWith('.dart')) continue;
 
-        // 1. Remplacer print() par debugPrint() (Norme de production)
-        // On s'assure d'abord que le fichier importe foundation.dart
-        if (content.contains('print(') && !content.contains("import 'package:flutter/foundation.dart';")) {
-          content = "import 'package:flutter/foundation.dart';\n" + content;
+      String content = file.readAsStringSync();
+      bool modified = false;
+
+      // 1. Remplacer print() par debugPrint() pour la sécurité
+      if (content.contains(RegExp(r'\bprint\('))) {
+        if (!content.contains("import 'package:flutter/foundation.dart';")) {
+          content = "import 'package:flutter/foundation.dart';\n$content";
         }
-        if (content.contains('print(')) {
-          printCount += '#'.allMatches(content.replaceAll('print(', '#')).length;
-          content = content.replaceAll('print(', 'debugPrint(');
+        content = content.replaceAll(RegExp(r'\bprint\('), 'debugPrint(');
+        modified = true;
+      }
+
+      // 2. Correction du switch inutile (unreachable_switch_default)
+      if (content.contains('case NodeType.pc: default:')) {
+        content = content.replaceAll('case NodeType.pc: default:', 'case NodeType.pc:');
+        modified = true;
+      }
+
+      // 3. Suppression des variables mortes spécifiques (Code Mort)
+      final deadCodes = [
+        'int quality = 0;',
+        'List<DesktopWifiNetwork> desktopNetworks = [];',
+        'final Color kTextMain = Colors.white;',
+        'int? _pingLatencyMs;',
+      ];
+
+      for (String deadCode in deadCodes) {
+        if (content.contains(deadCode)) {
+          content = content.replaceAll(deadCode, '');
           modified = true;
         }
+      }
 
-        // 2. Correction du switch (unreachable_switch_default)
-        if (content.contains('case NodeType.pc: default: icon =')) {
-          content = content.replaceAll('case NodeType.pc: default: icon =', 'case NodeType.pc: icon =');
-          switchCount++;
-          modified = true;
-        }
+      // 4. Correction des couleurs obsolètes pour le Switch/Slider
+      if (content.contains('activeColor:')) {
+        content = content.replaceAll('activeColor:', 'activeTrackColor:');
+        modified = true;
+      }
 
-        // Sauvegarde
-        if (modified) {
-          entity.writeAsStringSync(content);
-          print("✔️ Nettoyé : ${entity.path}");
-        }
+      // Sauvegarde du fichier si modifié
+      if (modified) {
+        file.writeAsStringSync(content);
+        print("✔️ Fichier optimisé : ${file.path}");
       }
     }
   }
 
-  processDirectory(dir);
-  processDirectory(backendDir);
+  cleanDirectory(dir);
+  cleanDirectory(backendDir);
 
   print("\n=====================================================");
-  print("🎉 NETTOYAGE EXPERT TERMINÉ !");
-  print("🤫 'print' sécurisés en 'debugPrint' : $printCount");
-  print("🧹 'default' inutiles supprimés : $switchCount");
+  print("🎉 NETTOYAGE COMPLET TERMINÉ ! Ton code est parfait.");
   print("=====================================================\n");
 }

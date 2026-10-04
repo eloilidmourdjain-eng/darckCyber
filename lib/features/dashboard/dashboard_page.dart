@@ -1,12 +1,12 @@
 ﻿import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:async'; // Ajouté pour le Timer des cartes dynamiques
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:darck_puls/features/auth/login_page.dart'; // Pour la déconnexion
+import 'package:darck_puls/features/auth/login_page.dart';
 
-// Importation de toutes tes fenêtres métiers
 import 'package:darck_puls/core/models/user_role.dart';
 import 'package:darck_puls/features/scan/network_scan_page.dart';
 import 'package:darck_puls/features/network_analysis/wifi_analyzer_screen.dart';
@@ -18,7 +18,7 @@ import 'package:darck_puls/features/maintenance/maintenance_screen.dart';
 import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  final UserRole role; // Habilitation injectée lors du Login
+  final UserRole role;
 
   const MainNavigationScreen({super.key, required this.role});
 
@@ -38,11 +38,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _initializeMenu();
   }
 
-  // --- MOTEUR DE GÉNÉRATION DYNAMIQUE DU MENU (RBAC) ---
   void _initializeMenu() {
-    // 1. Liste des fenêtres communes (Pour tous les administrateurs)
     _screens = [
-      const HomeSummaryView(), // 🚀 L'ÉCRAN D'ACCUEIL ANIMÉ
+      const HomeSummaryView(), // 🚀 L'ÉCRAN D'ACCUEIL DYNAMIQUE
       const NetworkScanPage(),
       const WifiAnalyzerScreen(),
       const SecurityAlertsScreen(),
@@ -63,13 +61,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       NavigationItem(icon: CupertinoIcons.wrench_fill, label: "NetOps"),
     ];
 
-    // 2. PRIVILÈGE SUPER ADMIN : Ajout de la Console Restreinte
     if (widget.role == UserRole.superAdmin) {
-      _screens.add(const SuperAdminToolsPage()); // La War Room
+      _screens.add(const SuperAdminToolsPage());
       _navItems.add(NavigationItem(
-          icon: CupertinoIcons.flame_fill, // Icône plus agressive pour le Root
+          icon: CupertinoIcons.flame_fill,
           label: "Root Console",
-          color: const Color(0xFFFF2A55) // Rouge Néon
+          color: const Color(0xFFFF2A55)
       ));
     }
   }
@@ -78,30 +75,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Breakpoint Responsive : Desktop/Tablette vs Mobile
         bool isDesktop = constraints.maxWidth > 900;
 
         return Scaffold(
-          backgroundColor: const Color(0xFF070B14), // Noir très profond
+          backgroundColor: const Color(0xFF070B14),
           body: Row(
             children: [
-              // --- MENU LATÉRAL (Pour PC/Linux/Mac) ---
-              if (isDesktop)
-                _buildDesktopSidebar(),
-
-              // --- CONTENU PRINCIPAL ---
+              if (isDesktop) _buildDesktopSidebar(),
               Expanded(
                 child: Stack(
                   children: [
-                    // Moteur d'affichage avec transition fluide
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
                       switchInCurve: Curves.easeOutExpo,
                       switchOutCurve: Curves.easeInExpo,
                       child: _screens[_currentIndex],
                     ),
-
-                    // --- BARRE DE NAVIGATION FLOTTANTE (Pour Mobile iOS/Android) ---
                     if (!isDesktop)
                       Positioned(
                         bottom: 20, left: 16, right: 16,
@@ -117,21 +106,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  // ==========================================
-  // WIDGET : BARRE LATÉRALE (DESKTOP)
-  // ==========================================
   Widget _buildDesktopSidebar() {
     return Container(
       width: 100,
       decoration: BoxDecoration(
-        color: const Color(0xFF131C2D), // Fond carte
+        color: const Color(0xFF131C2D),
         border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20)],
       ),
       child: Column(
         children: [
           const SizedBox(height: 40),
-          // Logo ou blason de l'application
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -190,14 +175,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ),
 
-          // Bouton de déconnexion (Zero Trust)
           Padding(
             padding: const EdgeInsets.only(bottom: 24.0),
             child: IconButton(
               icon: const Icon(CupertinoIcons.power, color: Colors.redAccent),
               tooltip: "Verrouiller la session",
               onPressed: () {
-                // Détruit le routeur actuel et retourne au login
                 Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -211,9 +194,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  // ==========================================
-  // WIDGET : BARRE DE NAVIGATION (MOBILE)
-  // ==========================================
   Widget _buildMobileBottomBar() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(30),
@@ -227,7 +207,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20)],
           ),
-          // Scroll Horizontal (Très utile car l'app a de nombreuses fenêtres)
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -279,9 +258,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 }
 
-// ==========================================
-// MODÈLE DE DONNÉES
-// ==========================================
 class NavigationItem {
   final IconData icon;
   final String label;
@@ -291,7 +267,7 @@ class NavigationItem {
 }
 
 // =====================================================================
-// NOUVEL ÉCRAN D'ACCUEIL : HOME SUMMARY (Animé, Logo Custom, Cyber)
+// ÉCRAN D'ACCUEIL : HOME SUMMARY (Animé, Dynamique, Logo Asset)
 // =====================================================================
 class HomeSummaryView extends StatefulWidget {
   const HomeSummaryView({super.key});
@@ -302,145 +278,195 @@ class HomeSummaryView extends StatefulWidget {
 
 class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderStateMixin {
   late AnimationController _bgLogoController;
+  late AnimationController _orbController;
   late AnimationController _entryController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // --- VARIABLES DYNAMIQUES POUR LES CARTES ---
+  Timer? _liveDataTimer;
+  int _threatsBlocked = 1204;
+  int _activeNodes = 42;
+  double _uptime = 99.98;
+
   @override
   void initState() {
     super.initState();
-    // Animation pour la lévitation (sans rotation)
     _bgLogoController = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
-
-    // Animation d'entrée des cartes (Fade-In et Glissement)
+    _orbController = AnimationController(vsync: this, duration: const Duration(seconds: 15))..repeat();
     _entryController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _entryController, curve: Curves.easeOut));
     _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(CurvedAnimation(parent: _entryController, curve: Curves.easeOutExpo));
 
     _entryController.forward();
+
+    // 🚀 MOTEUR DE DONNÉES EN TEMPS RÉEL
+    _liveDataTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted) return;
+      setState(() {
+        // Ajoute entre 0 et 3 nouvelles menaces bloquées toutes les 4 secondes
+        _threatsBlocked += math.Random().nextInt(4);
+
+        // Fait légèrement fluctuer les nœuds réseau
+        if (math.Random().nextBool()) {
+          _activeNodes = 40 + math.Random().nextInt(6); // Entre 40 et 45
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
     _bgLogoController.dispose();
+    _orbController.dispose();
     _entryController.dispose();
+    _liveDataTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // --- 1. ARRIÈRE-PLAN : TON LOGO ANIMÉ (Lévitation uniquement) ---
-        Positioned.fill(
-          child: AnimatedBuilder(
-              animation: _bgLogoController,
-              builder: (context, child) {
-                // Lévitation douce (Mouvement haut/bas lent)
-                final dy = math.sin(_bgLogoController.value * 2 * math.pi) * 30;
+    final size = MediaQuery.of(context).size;
 
-                return Transform.translate(
-                  offset: Offset(0, dy),
-                  child: Opacity(
-                    opacity: 0.04, // Effet filigrane (Watermark)
-                    child: Center(
-                      child: Image.asset(
-                        'logo.png', // 👈 CORRECTION: Chemin mis à jour vers la racine !
-                        width: 600,
-                        height: 600,
-                        fit: BoxFit.contain,
-                        // Fallback de sécurité robuste au cas où l'image n'est pas dans le pubspec
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                            CupertinoIcons.shield_lefthalf_fill,
-                            size: 600,
-                            color: Colors.white
-                        ),
-                      ),
+    return ClipRect( // 👈 CORRECTION CRITIQUE : Empêche le flou de baver sur la barre latérale !
+      child: Stack(
+        children: [
+          // --- 1. ARRIÈRE-PLAN : GRILLE CYBER ---
+          CustomPaint(
+            size: Size(size.width, size.height),
+            painter: CyberGridPainter(color: Colors.white.withValues(alpha: 0.03)),
+          ),
+
+          // --- 2. ARRIÈRE-PLAN : ORBES LUMINEUSES ---
+          AnimatedBuilder(
+              animation: _orbController,
+              builder: (context, child) {
+                final x1 = math.cos(_orbController.value * 2 * math.pi) * 150;
+                final y1 = math.sin(_orbController.value * 2 * math.pi) * 150;
+                final x2 = math.sin(_orbController.value * 2 * math.pi) * 200;
+                final y2 = math.cos(_orbController.value * 2 * math.pi) * 200;
+
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: size.height * 0.2 + y1, left: size.width * 0.2 + x1,
+                      child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF00E5FF).withValues(alpha: 0.08))),
                     ),
-                  ),
+                    Positioned(
+                      bottom: size.height * 0.1 + y2, right: size.width * 0.1 + x2,
+                      child: Container(width: 400, height: 400, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF8B5CF6).withValues(alpha: 0.08))),
+                    ),
+                  ],
                 );
               }
           ),
-        ),
 
-        // Filtre de verre dépoli par-dessus le logo pour l'incruster dans l'UI
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(color: Colors.transparent),
-        ),
+          // --- 3. ARRIÈRE-PLAN : TON LOGO (Lévitation) ---
+          Positioned.fill(
+            child: AnimatedBuilder(
+                animation: _bgLogoController,
+                builder: (context, child) {
+                  final dy = math.sin(_bgLogoController.value * 2 * math.pi) * 30;
 
-        // --- 2. CONTENU PRINCIPAL (Cartes et Stats) ---
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Status
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.greenAccent.withValues(alpha: 0.1), shape: BoxShape.circle, border: Border.all(color: Colors.greenAccent)),
-                          child: const Icon(CupertinoIcons.checkmark_shield_fill, color: Colors.greenAccent, size: 30),
+                  return Transform.translate(
+                    offset: Offset(0, dy),
+                    child: Opacity(
+                      opacity: 0.05, // Effet filigrane (Watermark)
+                      child: Center(
+                        child: Image.asset(
+                          'assets/Logo_principal.png', // 👈 CHEMIN CORRIGÉ VERS TON LOGO DANS ASSETS
+                          width: 500,
+                          height: 500,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                              CupertinoIcons.shield_lefthalf_fill,
+                              size: 500,
+                              color: Colors.white
+                          ),
                         ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("DARK PULSE CORE", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                            Text("Tous les systèmes sont opérationnels.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 48),
+                  );
+                }
+            ),
+          ),
 
-                    // Grid des statistiques rapides (NOC)
-                    const Text("VUE D'ENSEMBLE (NOC)", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    const SizedBox(height: 16),
-                    LayoutBuilder(
-                        builder: (context, constraints) {
-                          int crossAxisCount = constraints.maxWidth > 600 ? 3 : 1;
-                          return GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: constraints.maxWidth > 600 ? 2.0 : 3.0,
+          // FILTRE DE VERRE DÉPOLI (Contenu dans le ClipRect, ne floute pas la sidebar)
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.transparent),
+          ),
+
+          // --- 4. CONTENU PRINCIPAL (Cartes Dynamiques) ---
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.greenAccent.withValues(alpha: 0.1), shape: BoxShape.circle, border: Border.all(color: Colors.greenAccent)),
+                            child: const Icon(CupertinoIcons.checkmark_shield_fill, color: Colors.greenAccent, size: 30),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildStatCard("Uptime Réseau", "99.98%", CupertinoIcons.timer, const Color(0xFF00E5FF)),
-                              _buildStatCard("Menaces Isolées", "1,204", CupertinoIcons.shield_lefthalf_fill, const Color(0xFFFF2A55)),
-                              _buildStatCard("Nœuds Actifs", "42", CupertinoIcons.device_desktop, const Color(0xFF8B5CF6)),
+                              const Text("DARK PULSE CORE", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                              Text("Tous les systèmes sont opérationnels.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
                             ],
-                          );
-                        }
-                    ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 48),
 
-                    const SizedBox(height: 48),
+                      const Text("VUE D'ENSEMBLE (LIVE NOC)", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      const SizedBox(height: 16),
+                      LayoutBuilder(
+                          builder: (context, constraints) {
+                            int crossAxisCount = constraints.maxWidth > 600 ? 3 : 1;
+                            return GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: constraints.maxWidth > 600 ? 2.0 : 3.0,
+                              children: [
+                                _buildStatCard("Uptime Réseau", "$_uptime%", CupertinoIcons.timer, const Color(0xFF00E5FF)),
+                                _buildStatCard("Menaces Isolées", "$_threatsBlocked", CupertinoIcons.shield_lefthalf_fill, const Color(0xFFFF2A55)),
+                                _buildStatCard("Nœuds Actifs", "$_activeNodes", Icons.dns, const Color(0xFF8B5CF6)),
+                              ],
+                            );
+                          }
+                      ),
 
-                    // Activités récentes simulées
-                    const Text("ACTIVITÉ RÉCENTE", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                    const SizedBox(height: 16),
-                    _buildActivityRow("Synchronisation GitOps (Vault) réussie.", "Il y a 5 min", CupertinoIcons.cloud_upload),
-                    _buildActivityRow("Analyse Wi-Fi de routine terminée.", "Il y a 12 min", CupertinoIcons.waveform_path),
-                    _buildActivityRow("Nouvel accès Administrateur (John_Doe).", "Il y a 45 min", CupertinoIcons.person_alt),
-                  ],
+                      const SizedBox(height: 48),
+
+                      const Text("ACTIVITÉ RÉCENTE", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      const SizedBox(height: 16),
+                      _buildActivityRow("Télémétrie IA : Aucune dérive critique détectée.", "En direct", CupertinoIcons.waveform_path_ecg),
+                      _buildActivityRow("Synchronisation GitOps (Vault) réussie.", "Il y a 5 min", CupertinoIcons.cloud_upload),
+                      _buildActivityRow("Analyse Wi-Fi de routine terminée.", "Il y a 12 min", CupertinoIcons.wifi),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  // --- WIDGET UTILITAIRE : Carte Statistique ---
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -473,7 +499,6 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
     );
   }
 
-  // --- WIDGET UTILITAIRE : Ligne d'activité ---
   Widget _buildActivityRow(String text, String time, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -493,4 +518,29 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
       ),
     );
   }
+}
+
+class CyberGridPainter extends CustomPainter {
+  final Color color;
+  CyberGridPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    const double spacing = 40.0;
+
+    for (double i = 0; i < size.width; i += spacing) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+    for (double i = 0; i < size.height; i += spacing) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

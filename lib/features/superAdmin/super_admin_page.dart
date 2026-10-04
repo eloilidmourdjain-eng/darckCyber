@@ -18,7 +18,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   final Color kBackgroundColor = const Color(0xFF05000A); // Noir très profond avec reflet
   final Color kCardColor = const Color(0xFF130B1C);
   final Color kRootColor = const Color(0xFFFF2A55); // Rouge Néon (Privilège Root)
-  final Color kTextMain = Colors.white;
+  
   final Color kTextSecondary = const Color(0xFF94A3B8);
 
   late TabController _tabController;
