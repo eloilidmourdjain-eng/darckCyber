@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:shelf/shelf_io.dart' as io;
@@ -7,88 +6,93 @@ import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() async {
-  // SÉCURITÉ ARCHITECTURALE : Utilisation d'un Set thread-safe/géré proprement pour les clients
-  final Set<WebSocketChannel> clients = {};
+  final Set<WebSocketChannel> dashboardClients = {};
 
-  var handler = webSocketHandler((WebSocketChannel webSocket) {
-    clients.add(webSocket);
-    debugPrint("🔌 Nouvelle liaison sécurisée établie avec un client dashboard.");
+  // ========================================================
+  // 1. SERVEUR WEBSOCKET (Pour envoyer les alertes à Flutter)
+  // ========================================================
+  var wsHandler = webSocketHandler((WebSocketChannel webSocket) {
+    dashboardClients.add(webSocket);
+    debugPrint("🔌 [C2-NODE] Application Dashboard Dark Pulse connectée.");
 
-    // Écoute des messages entrants pour gérer la fermeture ou le ping/pong
     webSocket.stream.listen(
-          (message) {
-        // Traitement optionnel des commandes de contrôle reçues du client
-      },
-      onDone: () {
-        clients.remove(webSocket);
-        debugPrint("🔌 Déconnexion propre d'un client dashboard.");
-      },
-      onError: (error) {
-        clients.remove(webSocket);
-        debugPrint("⚠️ Erreur de socket client détectée : $error");
-      },
+          (message) {},
+      onDone: () => dashboardClients.remove(webSocket),
+      onError: (err) => dashboardClients.remove(webSocket),
     );
   });
 
-  // Démarrage sécurisé du serveur HTTP/WS sur l'interface locale ou durcie
-  final server = await io.serve(handler, '0.0.0.0', 8080);
-  debugPrint('🚀 Serveur IDS Réel (Dark Pulse SecOps) actif sur le port ${server.port}');
+  final wsServer = await io.serve(wsHandler, '0.0.0.0', 8080);
+  debugPrint('🚀 [SIEM] WebSocket actif sur le port ${wsServer.port}');
 
-  // SÉCURITÉ : Vérification de l'existence du fichier de log avant de lancer le processus
-  const logPath = '/var/log/auth.log';
-  final logFile = File(logPath);
-
-  if (!await logFile.exists()) {
-    debugPrint("❌ Avertissement critique : Le fichier de journalisation $logPath est introuvable.");
-    debugPrint("💡 Assurez-vous que rsyslog est actif ou ajustez la source vers journalctl.");
-    return;
-  }
+  // ========================================================
+  // 2. SERVEUR SYSLOG UDP RÉEL (Écoute les vrais routeurs)
+  // ========================================================
+  // Port 5145 utilisé pour éviter l'obligation d'être root (le port Syslog par défaut est 514)
+  final int syslogPort = 5145;
 
   try {
-    // --- ALGORITHME D'ANALYSE DE LOGS SÉCURISÉ (Tail -f) ---
-    final process = await Process.start('tail', ['-F', logPath]);
+    RawDatagramSocket syslogSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, syslogPort);
+    debugPrint('🛡️ [SIEM] Écoute des trames Syslog UDP réelles sur le port $syslogPort...');
 
-    // Regex stricte pour capturer l'IP source des échecs d'authentification SSH
-    final regexFailed = RegExp(r'Failed password for (?:invalid user )?.* from ([0-9a-fA-F:\.]+) port');
+    // Moteur d'expressions régulières (Regex) pour l'analyse Forensics
+    final ipRegex = RegExp(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b');
 
-    process.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen((line) {
-      if (line.contains('Failed password')) {
-        final match = regexFailed.firstMatch(line);
-        if (match != null) {
-          final attackerIp = match.group(1)!;
-
-          final alertPacket = {
-            "title": "Brute-force SSH détecté",
-            "source_ip": attackerIp,
-            "target": "Serveur_Core",
-            "severity": "CRITICAL",
-            "severity_score": 9.5,
-            "timestamp": DateTime.now().toIso8601String().substring(11, 19)
-          };
-
-          final jsonString = jsonEncode(alertPacket);
-
-          // DIFFUSION SÉCURISÉE : Itération sur une copie/Set pour éviter les erreurs de modification concurrente
-          for (var client in List.from(clients)) {
-            try {
-              client.sink.add(jsonString);
-            } catch (e) {
-              debugPrint("❌ Échec d'envoi au client, suppression de la socket zombie : $e");
-              clients.remove(client);
-              client.sink.close();
-            }
-          }
-          debugPrint("🚨 Menace Réelle isolée et diffusée : $attackerIp");
+    // Écoute des paquets réseaux entrants
+    syslogSocket.listen((RawSocketEvent event) {
+      if (event == RawSocketEvent.read) {
+        Datagram? datagram = syslogSocket.receive();
+        if (datagram != null) {
+          String logMessage = utf8.decode(datagram.data);
+          _analyzeRealLog(logMessage, datagram.address.address, dashboardClients, ipRegex);
         }
       }
-    }, onError: (err) {
-      debugPrint("❌ Erreur critique du processus tail : $err");
     });
-
   } catch (e) {
-    debugPrint("❌ Impossible de démarrer le sous-système de surveillance des logs : $e");
+    debugPrint("❌ [CRITICAL] Échec de la liaison UDP Syslog : $e");
+  }
+}
+
+// --- MOTEUR D'ANALYSE HEURISTIQUE (IA BAsique) ---
+void _analyzeRealLog(String log, String routerIp, Set<WebSocketChannel> clients, RegExp ipRegex) {
+  // 1. Détection des signatures d'attaques
+  bool isSshBruteForce = log.contains("Failed password") || log.contains("Invalid user");
+  bool isPortScan = log.contains("UFW BLOCK") || log.contains("DROP");
+  bool isWafAlert = log.contains("ModSecurity") || log.contains("SQLi") || log.contains("XSS");
+
+  if (isSshBruteForce || isPortScan || isWafAlert) {
+    // 2. Extraction de l'IP de l'attaquant
+    final matches = ipRegex.allMatches(log);
+    String attackerIp = "Inconnue";
+
+    // Souvent, la dernière IP dans le log est celle de l'attaquant
+    if (matches.isNotEmpty) {
+      attackerIp = matches.last.group(0)!;
+    }
+
+    // On ignore le log si c'est notre propre routeur qui parle
+    if (attackerIp == routerIp || attackerIp == "127.0.0.1") return;
+
+    String threatType = isSshBruteForce ? "Brute-Force SSH" : (isPortScan ? "Balayage Pare-feu (Port Scan)" : "Alerte WAF (Web Attack)");
+    double score = isWafAlert ? 9.8 : (isSshBruteForce ? 8.5 : 5.0);
+
+    // 3. Création du paquet d'alerte
+    final alertPacket = {
+      "title": "DÉTECTION RÉELLE : $threatType",
+      "source_ip": attackerIp,
+      "target": "Passerelle ($routerIp)",
+      "severity": score > 7 ? "CRITICAL" : "WARNING",
+      "severity_score": score,
+      "timestamp": DateTime.now().toIso8601String().substring(11, 19),
+      "raw_log": log // On garde la preuve Forensics
+    };
+
+    final jsonString = jsonEncode(alertPacket);
+
+    // 4. Diffusion immédiate aux dashboards Flutter
+    for (var client in List.from(clients)) {
+      client.sink.add(jsonString);
+    }
+    debugPrint("🚨 [MENACE DÉTECTÉE] Origine: $attackerIp -> Cible: $routerIp");
   }
 }
