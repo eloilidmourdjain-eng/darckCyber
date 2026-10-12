@@ -10,6 +10,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// ⚠️ IMPORTS DE TES MOTEURS D'AUDIT NATIFS (Chemin corrigé vers le dossier 'defensive')
+import 'package:darck_puls/features/superAdmin/cyber_tools/defensive/audit_cli_wrapper.dart';
+import 'package:darck_puls/features/superAdmin/cyber_tools/defensive/audit_process_manager.dart';
+
 // --- MULTITHREADING (Isolates) ---
 Map<String, dynamic>? parseAlertIsolate(String rawJson) {
   try {
@@ -26,7 +30,7 @@ class EdrAgent {
   final String os;
   final String status;
   bool isIsolated;
-  List<Map<String, String>> activeThreats; // Processus suspects
+  List<Map<String, String>> activeThreats;
 
   EdrAgent(this.hostname, this.ip, this.os, this.status, {this.isIsolated = false, this.activeThreats = const []});
 }
@@ -66,6 +70,31 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   bool _isConnected = false;
   bool _isNetworkSecured = true;
 
+  // --- ÉTATS DU NOUVEL ONGLET AUDIT (NMAP/WIRESHARK) ---
+  final TextEditingController _targetController = TextEditingController(text: "192.168.1.1");
+  final AuditProcessManager _processManager = AuditProcessManager();
+  bool _isAuditing = false;
+  String _auditConsoleOutput = "Terminal d'Audit Réseau Initialisé.\nEn attente de commande...";
+  String _selectedTool = 'nmap';
+  String _selectedProfile = 'fast_discovery';
+
+  final Map<String, Map<String, String>> _toolProfiles = {
+    'nmap': {
+      'fast_discovery': 'Scan Rapide (Ping Sweep)',
+      'service_audit': 'Audit des Services & Versions',
+    },
+    'tshark': {
+      'capture_dns': 'Wireshark : Capture Trafic DNS',
+      'capture_tcp': 'Wireshark : Capture Trafic TCP',
+    },
+    'iperf3': {
+      'bandwidth_test': 'Test de Bande Passante (10s)',
+    },
+    'mtr': {
+      'diag_route': 'Diagnostic de Routage Dynamique',
+    }
+  };
+
   // --- BASES DE DONNÉES BLUE TEAM SIMULÉES ---
   final List<EdrAgent> _edrAgents = [
     EdrAgent("SRV-DB-01", "10.0.0.5", "Linux (Ubuntu)", "Sain"),
@@ -77,7 +106,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   final List<NidsRule> _nidsRules = [
     NidsRule("2010935", "ET SCAN Suspicious inbound to MSSQL port 1433", "Reconnaissance", true, true),
     NidsRule("2024364", "ET MALWARE Win32/Trickbot CnC Checkin", "Malware C2", true, true),
-    NidsRule("2013028", "ET POLICY Cleartext Credentials over HTTP", "Policy Violation", true, false), // Alert Only
+    NidsRule("2013028", "ET POLICY Cleartext Credentials over HTTP", "Policy Violation", true, false),
   ];
 
   final TextEditingController _ctiSearchController = TextEditingController();
@@ -93,7 +122,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // 5 Onglets maintenant
+    _tabController = TabController(length: 6, vsync: this); // 6 Onglets
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
 
     for (int i = 0; i < 20; i++) {
@@ -126,6 +155,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
     _tabController.dispose();
     _pulseController.dispose();
     _ctiSearchController.dispose();
+    _targetController.dispose();
     super.dispose();
   }
 
@@ -165,7 +195,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   }
 
   void _executeEdrKillProcess(EdrAgent agent, String pid) async {
-    Navigator.pop(context); // Fermer le modal
+    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Agent EDR: Envoi du signal SIGKILL au processus $pid sur ${agent.hostname}...'), backgroundColor: kPanelColor));
 
     await Future.delayed(const Duration(seconds: 2));
@@ -179,7 +209,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   }
 
   // ==========================================
-  // BUILD PRINCIPAL
+  // BUILD PRINCIPAL (L'UI DU DASHBOARD)
   // ==========================================
   @override
   Widget build(BuildContext context) {
@@ -199,9 +229,10 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
           tabs: const [
             Tab(icon: Icon(CupertinoIcons.shield_lefthalf_fill), text: "Radar SIEM"),
             Tab(icon: Icon(CupertinoIcons.device_desktop), text: "Wazuh EDR"),
-            Tab(icon: Icon(CupertinoIcons.search), text: "Threat Intel (CTI)"),
+            Tab(icon: Icon(CupertinoIcons.search), text: "Threat Intel"),
             Tab(icon: Icon(CupertinoIcons.layers_alt_fill), text: "Règles NIDS"),
             Tab(icon: Icon(CupertinoIcons.list_bullet), text: "Logs Réseau"),
+            Tab(icon: Icon(CupertinoIcons.waveform_path), text: "Audit Actif"),
           ],
         ),
       ),
@@ -210,11 +241,12 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
           controller: _tabController,
           physics: const BouncingScrollPhysics(),
           children: [
-            _buildRadarTab(),     // 1. SIEM & Radar
-            _buildEdrTab(),       // 2. EDR (Nouveau)
-            _buildCtiTab(),       // 3. Threat Intel (Nouveau)
-            _buildNidsTab(),      // 4. Règles Suricata/Snort (Nouveau)
-            _buildSiemLogTab(),   // 5. Logs purs
+            _buildRadarTab(),
+            _buildEdrTab(),
+            _buildCtiTab(),
+            _buildNidsTab(),
+            _buildSiemLogTab(),
+            _buildAuditTab(),
           ],
         ),
       ),
@@ -241,7 +273,223 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
   }
 
   // ==========================================
-  // ONGLET 1 : RADAR & VÉLOCITÉ (Fusionnés pour efficacité)
+  // ONGLET 6 : AUDIT ACTIF (TShark, Nmap, MTR)
+  // ==========================================
+  Widget _buildAuditTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: kPanelColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("OUTILS DE DIAGNOSTIC NATIFS (OS INTÉGRÉ)", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDropdown(
+                        label: "Moteur d'Audit",
+                        value: _selectedTool,
+                        items: _toolProfiles.keys.toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedTool = val!;
+                            _selectedProfile = _toolProfiles[val]!.keys.first;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDropdown(
+                        label: "Profil d'Exécution",
+                        value: _selectedProfile,
+                        items: _toolProfiles[_selectedTool]!.keys.toList(),
+                        displayMap: _toolProfiles[_selectedTool],
+                        onChanged: (val) => setState(() => _selectedProfile = val!),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                const Text("Cible de l'Audit (IP / CIDR / Localhost)", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(color: const Color(0xFF070B14), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+                  child: TextField(
+                    controller: _targetController,
+                    style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 14),
+                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 12)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kCyan,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: _isAuditing
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                            : const Icon(CupertinoIcons.play_arrow_solid, size: 16),
+                        label: Text(_isAuditing ? "ANALYSE EN COURS..." : "DÉMARRER LA COLLECTE", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: _isAuditing ? null : _runAuditTool,
+                      ),
+                    ),
+                    if (_isAuditing) ...[
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kRed.withValues(alpha: 0.1),
+                          foregroundColor: kRed,
+                          side: const BorderSide(color: Color(0xFFFF2A55)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(CupertinoIcons.stop_fill, size: 16),
+                        label: const Text("KILL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: _stopAuditTool,
+                      ),
+                    ]
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF000000),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kCyan.withValues(alpha: 0.3)),
+                boxShadow: [BoxShadow(color: kCyan.withValues(alpha: 0.05), blurRadius: 20)],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(CupertinoIcons.circle_fill, color: Colors.redAccent, size: 10), const SizedBox(width: 6),
+                      const Icon(CupertinoIcons.circle_fill, color: Colors.orangeAccent, size: 10), const SizedBox(width: 6),
+                      const Icon(CupertinoIcons.circle_fill, color: Colors.greenAccent, size: 10), const SizedBox(width: 12),
+                      Text("Stdout / Console (Audit Process)", style: TextStyle(color: Colors.blueGrey[600], fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: Colors.white12, height: 1)),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Text(
+                        _auditConsoleOutput,
+                        style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 12, height: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _runAuditTool() async {
+    setState(() {
+      _isAuditing = true;
+      _auditConsoleOutput = "[SYSTÈME] Initialisation de $_selectedTool sur la cible ${_targetController.text}...\n";
+    });
+
+    try {
+      final cmdData = AuditCliWrapper.buildCommand(
+        toolName: _selectedTool,
+        target: _targetController.text.trim(),
+        auditProfile: _selectedProfile,
+      );
+
+      await _processManager.startTool(
+          cmdData['executable'],
+          cmdData['arguments'],
+              (output) {
+            if (mounted) {
+              setState(() => _auditConsoleOutput += "$output\n");
+            }
+          },
+              (exitCode) {
+            if (mounted) {
+              setState(() {
+                _isAuditing = false;
+                _auditConsoleOutput += "\n[SYSTÈME] Tâche terminée avec le code $exitCode.\n";
+              });
+            }
+          }
+      );
+    } catch (e) {
+      setState(() {
+        _isAuditing = false;
+        _auditConsoleOutput += "\n❌ [BLOCAGE SÉCURITÉ] : $e\n";
+      });
+    }
+  }
+
+  void _stopAuditTool() {
+    _processManager.killActiveProcess();
+    setState(() {
+      _isAuditing = false;
+      _auditConsoleOutput += "\n🛑 [SYSTÈME] Interruption forcée (SIGKILL) par l'administrateur.\n";
+    });
+  }
+
+  Widget _buildDropdown({required String label, required String value, required List<String> items, required Function(String?) onChanged, Map<String, String>? displayMap}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: const Color(0xFF070B14), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              dropdownColor: kPanelColor,
+              value: value,
+              icon: const Icon(CupertinoIcons.chevron_down, color: Colors.blueGrey, size: 14),
+              style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 12),
+              items: items.map((String val) => DropdownMenuItem(value: val, child: Text(displayMap != null ? displayMap[val]! : val.toUpperCase(), overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // AUTRES ONGLETS (Code précédent inchangé)
   // ==========================================
   Widget _buildRadarTab() {
     Color glowColor = _isNetworkSecured ? Colors.greenAccent : kRed;
@@ -309,9 +557,6 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
     );
   }
 
-  // ==========================================
-  // ONGLET 2 : WAZUH EDR (Endpoint Detection & Response)
-  // ==========================================
   Widget _buildEdrTab() {
     return ListView.builder(
       padding: const EdgeInsets.all(24),
@@ -372,9 +617,6 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
     );
   }
 
-  // ==========================================
-  // ONGLET 3 : THREAT INTELLIGENCE (CTI Lookup)
-  // ==========================================
   Widget _buildCtiTab() {
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -404,7 +646,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 onPressed: () async {
                   setState(() { _isCtiSearching = true; _ctiResult = null; });
-                  await Future.delayed(const Duration(seconds: 2)); // Simule l'appel API VirusTotal
+                  await Future.delayed(const Duration(seconds: 2));
                   setState(() {
                     _isCtiSearching = false;
                     _ctiResult = {
@@ -432,7 +674,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text("RAPPORT D'ANALYSE CTI", style: TextStyle(color: Colors.blueGrey[300], fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: kRed.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)), child: Text(_ctiResult!["reputation"], style:  TextStyle(color: kRed, fontSize: 10, fontWeight: FontWeight.bold))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: kRed.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)), child: Text(_ctiResult!["reputation"], style: TextStyle(color: kRed, fontSize: 10, fontWeight: FontWeight.bold))),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -461,9 +703,6 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
     );
   }
 
-  // ==========================================
-  // ONGLET 4 : GESTION DES RÈGLES NIDS (Suricata)
-  // ==========================================
   Widget _buildNidsTab() {
     return ListView.builder(
       padding: const EdgeInsets.all(24),
@@ -514,9 +753,6 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
     );
   }
 
-  // ==========================================
-  // ONGLET 5 : FLUX SIEM
-  // ==========================================
   Widget _buildSiemLogTab() {
     final filteredAlerts = _selectedFilter == 'ALL' ? _alertsLog : _alertsLog.where((alert) => alert["severity"] == _selectedFilter).toList();
 
@@ -535,7 +771,9 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
           ),
         ),
         Expanded(
-          child: ListView.builder(
+          child: filteredAlerts.isEmpty
+              ? Center(child: Text("En attente de trames SIEM...", style: TextStyle(color: Colors.blueGrey[400])))
+              : ListView.builder(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: filteredAlerts.length,
