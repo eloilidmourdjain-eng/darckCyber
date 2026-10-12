@@ -47,7 +47,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> with SingleTicker
 
   // --- ÉTATS : TÉLÉMÉTRIE ---
   double _cpuUsage = 45.0;
-  double _ramUsage = 78.0;
+  final double _ramUsage = 78.0;
   double _tempCelsius = 62.0;
   bool _isVastAiActive = false;
   late Timer _telemetryTimer;

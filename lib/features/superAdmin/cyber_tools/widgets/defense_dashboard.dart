@@ -1,5 +1,5 @@
-﻿import 'package:flutter/material.dart';
-import 'package:darck_puls/features/superAdmin/screens/honeypot_monitor_page.dart'; // Ajustez si nécessaire
+import 'package:flutter/material.dart';
+// Ajustez si nécessaire
 
 class DefenseDashboardWidget extends StatelessWidget {
   const DefenseDashboardWidget({super.key});

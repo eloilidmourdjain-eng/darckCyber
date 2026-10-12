@@ -549,8 +549,9 @@ class NetworkTopologyPainter extends CustomPainter {
 
     for (var node in nodes) {
       Color nodeColor = const Color(0xFF00E5FF);
-      if (node.aiAnomalyScore > 0.8) nodeColor = const Color(0xFFFF2A55);
-      else if (node.aiAnomalyScore > 0.5) nodeColor = Colors.orangeAccent;
+      if (node.aiAnomalyScore > 0.8) {
+        nodeColor = const Color(0xFFFF2A55);
+      } else if (node.aiAnomalyScore > 0.5) nodeColor = Colors.orangeAccent;
 
       double nodeRadius = node.type == NodeType.router ? 32.0 : 22.0;
 

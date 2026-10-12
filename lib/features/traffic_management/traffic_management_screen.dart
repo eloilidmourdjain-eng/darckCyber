@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 
 // --- LE SERVICE API SÉCURISÉ (DevSecOps) ---
 class RouterApiService {
@@ -76,7 +74,7 @@ class ConnectedClient {
 
 // --- FENÊTRE UI / UX ---
 class TrafficManagementScreen extends StatefulWidget {
-  const TrafficManagementScreen({Key? key}) : super(key: key);
+  const TrafficManagementScreen({super.key});
 
   @override
   _TrafficManagementScreenState createState() => _TrafficManagementScreenState();
@@ -92,7 +90,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
   // Gestion du Debounce pour optimiser l'algorithme de curseur QoS
   Timer? _debounceTimer;
 
-  List<ConnectedClient> _clients = [
+  final List<ConnectedClient> _clients = [
     ConnectedClient("Serveur NAS", "00:11:22:33:44:55", "192.168.1.10", 1000.0, false),
     ConnectedClient("PC-Compta", "AA:BB:CC:DD:EE:FF", "192.168.1.55", 50.0, false),
     ConnectedClient("iPhone Visiteur", "11:22:33:44:55:66", "192.168.1.109", 5.0, false),

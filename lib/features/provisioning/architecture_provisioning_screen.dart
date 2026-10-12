@@ -17,8 +17,8 @@ class _ArchitectureAndProvisioningScreenState extends State<ArchitectureAndProvi
   final TextEditingController _ipController = TextEditingController(text: "192.168.10.1");
   final TextEditingController _vlanController = TextEditingController(text: "10");
 
-  bool _enableFTP = false;
-  bool _enableSNMP = true;
+  final bool _enableFTP = false;
+  final bool _enableSNMP = true;
   bool _enableDHCP = false;
   final TextEditingController _dhcpPoolName = TextEditingController(text: "DARK_PULSE_LAN");
   final TextEditingController _dhcpNetwork = TextEditingController(text: "192.168.10.0");
@@ -130,7 +130,7 @@ write memory
     // Séquence de simulation réaliste (CI/CD Pipeline)
     final steps = [
       "[CI/CD] Parsing du script IaC généré...",
-      "[CHECK] Validation de la syntaxe ${_selectedDeviceOS}... OK",
+      "[CHECK] Validation de la syntaxe $_selectedDeviceOS... OK",
       "[GNS3] Création du noeud virtuel : ${_hostnameController.text}...",
       "[NET] Attribution IP virtuelle: ${_ipController.text}/24...",
       "[NET] Activation de l'interface Vlan${_vlanController.text} (UP)...",

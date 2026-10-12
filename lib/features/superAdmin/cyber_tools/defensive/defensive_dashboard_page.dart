@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -735,7 +734,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   const Text("Activer", style: TextStyle(color: Colors.blueGrey, fontSize: 10)),
-                  CupertinoSwitch(value: rule.isActive, activeColor: Colors.greenAccent, onChanged: (val) => setState(() => rule.isActive = val)),
+                  CupertinoSwitch(value: rule.isActive, activeTrackColor: Colors.greenAccent, onChanged: (val) => setState(() => rule.isActive = val)),
                 ],
               ),
               const SizedBox(width: 16),
@@ -743,7 +742,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   const Text("Drop Traffic", style: TextStyle(color: Colors.blueGrey, fontSize: 10)),
-                  CupertinoSwitch(value: rule.dropTraffic, activeColor: kRed, onChanged: (val) => setState(() => rule.dropTraffic = val)),
+                  CupertinoSwitch(value: rule.dropTraffic, activeTrackColor: kRed, onChanged: (val) => setState(() => rule.dropTraffic = val)),
                 ],
               )
             ],

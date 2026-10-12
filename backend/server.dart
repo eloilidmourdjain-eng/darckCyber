@@ -65,7 +65,7 @@ void main() async {
 
   final handler = const Pipeline()
       .addMiddleware(logRequests())
-      .addHandler(app);
+      .addHandler(app.call);
 
   final server = await shelf_io.serve(handler, '0.0.0.0', 8080);
   debugPrint('Serveur de sécurité honeypot actif sur http://${server.address.host}:${server.port}');

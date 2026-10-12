@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,7 +9,7 @@ import 'package:wifi_scan/wifi_scan.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WifiAnalyzerScreen extends StatefulWidget {
-  const WifiAnalyzerScreen({Key? key}) : super(key: key);
+  const WifiAnalyzerScreen({super.key});
 
   @override
   _WifiAnalyzerScreenState createState() => _WifiAnalyzerScreenState();
@@ -367,8 +367,9 @@ class _WifiAnalyzerScreenState extends State<WifiAnalyzerScreen> {
 
   Widget _buildNetworkCard({required String ssid, required String bssid, required int level, required bool is5GHz, required int channel}) {
     Color signalColor = Colors.redAccent;
-    if (level > -60) signalColor = Colors.greenAccent;
-    else if (level > -80) signalColor = Colors.orangeAccent;
+    if (level > -60) {
+      signalColor = Colors.greenAccent;
+    } else if (level > -80) signalColor = Colors.orangeAccent;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -425,8 +426,9 @@ class DesktopWifiScanner {
   static Future<List<DesktopWifiNetwork>> scan() async {
     List<DesktopWifiNetwork> networks = [];
     try {
-      if (Platform.isWindows) networks = await _scanWindows();
-      else if (Platform.isLinux) networks = await _scanLinux();
+      if (Platform.isWindows) {
+        networks = await _scanWindows();
+      } else if (Platform.isLinux) networks = await _scanLinux();
       else if (Platform.isMacOS) networks = await _scanMacOS();
     } catch (e) {
       debugPrint("Desktop Scan Error: $e");

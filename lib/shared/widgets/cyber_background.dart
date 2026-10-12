@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class CyberBackground extends StatefulWidget {
   final Widget? child;
-  const CyberBackground({Key? key, this.child}) : super(key: key);
+  const CyberBackground({super.key, this.child});
 
   @override
   _CyberBackgroundState createState() => _CyberBackgroundState();

@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'dart:math' as math;
 import 'dart:async'; // Ajouté pour le Timer des cartes dynamiques
 import 'package:flutter/material.dart';
@@ -287,7 +287,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
   Timer? _liveDataTimer;
   int _threatsBlocked = 1204;
   int _activeNodes = 42;
-  double _uptime = 99.98;
+  final double _uptime = 99.98;
 
   @override
   void initState() {
