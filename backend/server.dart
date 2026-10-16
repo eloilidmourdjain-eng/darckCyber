@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -26,7 +25,7 @@ void main() async {
       };
 
       honeypotAlerts.insert(0, alert);
-      debugPrint('[ALERTE HONEYPOT] Intrusion détectée depuis ${alert['ip_address']}');
+      print('[ALERTE HONEYPOT] Intrusion détectée depuis ${alert['ip_address']}');
 
       return Response.ok(
         jsonEncode({'status': 'success', 'message': 'Alerte enregistrée'}),
@@ -52,7 +51,7 @@ void main() async {
     final String ip = data['ip_address'] ?? '';
 
     // Logique de simulation d'interaction pare-feu[cite: 12]
-    debugPrint('[ACTION SÉCURITÉ] Bannissement de l\'IP : $ip et invalidation des sessions.');
+    print('[ACTION SÉCURITÉ] Bannissement de l\'IP : $ip et invalidation des sessions.');
 
     // Supprimer l'alerte traitée de la liste active
     honeypotAlerts.removeWhere((alert) => alert['ip_address'] == ip);
@@ -68,5 +67,5 @@ void main() async {
       .addHandler(app.call);
 
   final server = await shelf_io.serve(handler, '0.0.0.0', 8080);
-  debugPrint('Serveur de sécurité honeypot actif sur http://${server.address.host}:${server.port}');
+  print('Serveur de sécurité honeypot actif sur http://${server.address.host}:${server.port}');
 }

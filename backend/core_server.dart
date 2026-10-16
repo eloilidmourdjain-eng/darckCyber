@@ -36,7 +36,7 @@ void main() async {
 
 class DarkPulseCore {
   final Set<WebSocketChannel> _dashboardClients = {};
-  final String _secretKey = "SUPER_SECRET_JWT_KEY_DEVSECOPS"; // À mettre dans un fichier .env
+  
 
   Future<void> start() async {
     // 1. Initialisation des routes API (Control Plane)

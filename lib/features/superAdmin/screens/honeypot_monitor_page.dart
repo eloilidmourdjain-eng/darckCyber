@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -73,12 +73,14 @@ class _HoneypotMonitorWidgetState extends State<HoneypotMonitorWidget> {
       );
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Action réussie : IP isolée du réseau.'), backgroundColor: Colors.red),
         );
         _fetchAlerts();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur de communication : $e'), backgroundColor: Colors.orange),
       );

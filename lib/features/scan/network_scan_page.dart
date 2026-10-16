@@ -94,8 +94,6 @@ class NetworkDiscoveryService {
         int pingTime = response.response!.time!.inMilliseconds;
         int ttl = response.response!.ttl ?? 64;
 
-        // CORRECTION : La variable _pingLatencyMs a été retirée d'ici pour être placée au bon endroit.
-
         // OS Fingerprinting basé sur le TTL réseau
         String osGuess = _guessOsByTtl(ttl);
 
@@ -183,7 +181,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   double _scanProgress = 0.0;
   String _pingResult = "Prêt à auditer le réseau local.";
 
-  // CORRECTION : La variable manquante est déclarée ici (Dans les états de l'interface)
+  // 👈 CORRECTION : La variable est DANS L'ÉTAT DU WIDGET, accessible par tout le code
   int? _pingLatencyMs;
 
   List<NetworkDevice> _connectedDevices = [];
@@ -504,7 +502,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text("Diffusion SSID (Wi-Fi)", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                  CupertinoSwitch(value: _isWifiConnected, activeTrackColor: Colors.greenAccent, onChanged: (val) => setState(() => _isWifiConnected = val)),
+                  CupertinoSwitch(value: _isWifiConnected, activeColor: Colors.greenAccent, onChanged: (val) => setState(() => _isWifiConnected = val)),
                 ],
               ),
               const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: Colors.white12, height: 1)),
@@ -529,7 +527,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                 title: const Text("Activer la Passerelle Captive", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                 subtitle: const Text("Bloque l'internet jusqu'à l'authentification", style: TextStyle(color: kTextSecondary, fontSize: 11)),
                 value: _isHotspotSharingActive,
-                activeTrackColor: Colors.purpleAccent,
+                activeColor: Colors.purpleAccent,
                 onChanged: (val) => setState(() => _isHotspotSharingActive = val),
               ),
               const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: Colors.white12, height: 1)),
@@ -543,7 +541,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
               ),
               const SizedBox(height: 8),
 
-              // CORRECTION: Utilisation des paramètres natifs du Slider
+              // 👈 CORRECTION DES COULEURS DU SLIDER ICI
               Slider(
                 value: _sharedBandwidthLimitMbps,
                 min: 10.0, max: 1000.0, divisions: 99,
