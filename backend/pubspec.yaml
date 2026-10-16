@@ -10,6 +10,6 @@ dependencies:
   shelf_web_socket: ^1.0.4      # Pour le flux de logs en direct
   web_socket_channel: ^2.4.0
   dart_jsonwebtoken: ^2.8.0     # Sécurité Zero Trust (JWT)
-  sqlite3: ^2.4.2           # 👈 LE MOTEUR DE BASE DE DONNÉES
+  sqlite3: ^2.4.2
   path: ^1.9.0
   
