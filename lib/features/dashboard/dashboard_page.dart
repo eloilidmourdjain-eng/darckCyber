@@ -1,13 +1,14 @@
 import 'dart:ui';
 import 'dart:math' as math;
-import 'dart:async'; // Ajouté pour le Timer des cartes dynamiques
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:darck_puls/features/auth/login_page.dart';
-
 import 'package:darck_puls/core/models/user_role.dart';
+
+// --- IMPORTATION DE TOUTES TES FENÊTRES MÉTIERS ---
 import 'package:darck_puls/features/scan/network_scan_page.dart';
 import 'package:darck_puls/features/network_analysis/wifi_analyzer_screen.dart';
 import 'package:darck_puls/features/security/security_alerts_screen.dart';
@@ -15,6 +16,11 @@ import 'package:darck_puls/features/topology/ai_topology_screen.dart';
 import 'package:darck_puls/features/traffic_management/traffic_management_screen.dart';
 import 'package:darck_puls/features/provisioning/architecture_provisioning_screen.dart';
 import 'package:darck_puls/features/maintenance/maintenance_screen.dart';
+
+// 🚀 NOUVELLES FENÊTRES INTÉGRÉES
+import 'package:darck_puls/features/logs/log_center_screen.dart';
+import 'package:darck_puls/features/settings/system_settings_screen.dart';
+
 import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -39,6 +45,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _initializeMenu() {
+    // 1. Liste des fenêtres communes (Pour tous les administrateurs)
     _screens = [
       const HomeSummaryView(), // 🚀 L'ÉCRAN D'ACCUEIL DYNAMIQUE
       const NetworkScanPage(),
@@ -48,6 +55,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const TrafficManagementScreen(),
       const ArchitectureAndProvisioningScreen(),
       const MaintenanceScreen(),
+      const LogCenterScreen(),      // 🆕 Ajout du Centre des Logs
+      const SystemSettingsScreen(), // 🆕 Ajout des Paramètres
     ];
 
     _navItems = [
@@ -59,8 +68,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       NavigationItem(icon: CupertinoIcons.slider_horizontal_3, label: "Trafic"),
       NavigationItem(icon: CupertinoIcons.square_stack_3d_up, label: "Infra (IaC)"),
       NavigationItem(icon: CupertinoIcons.wrench_fill, label: "NetOps"),
+      NavigationItem(icon: CupertinoIcons.list_bullet_indent, label: "Logs SIEM"), // 🆕
+      NavigationItem(icon: CupertinoIcons.settings, label: "Réglages"),            // 🆕
     ];
 
+    // 2. PRIVILÈGE SUPER ADMIN : Ajout de la Console Restreinte
     if (widget.role == UserRole.superAdmin) {
       _screens.add(const SuperAdminToolsPage());
       _navItems.add(NavigationItem(
@@ -118,13 +130,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         children: [
           const SizedBox(height: 40),
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 55,
+            height: 55,
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
                 color: const Color(0xFF00E5FF).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))
             ),
-            child: const Icon(CupertinoIcons.waveform_path_ecg, color: Color(0xFF00E5FF), size: 30),
+            child: Image.asset(
+              'assets/Logo_principal.png',
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                  CupertinoIcons.waveform_path_ecg,
+                  color: Color(0xFF00E5FF),
+                  size: 28
+              ),
+            ),
           ),
           const SizedBox(height: 30),
 
@@ -305,12 +327,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
     _liveDataTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (!mounted) return;
       setState(() {
-        // Ajoute entre 0 et 3 nouvelles menaces bloquées toutes les 4 secondes
         _threatsBlocked += math.Random().nextInt(4);
 
-        // Fait légèrement fluctuer les nœuds réseau
         if (math.Random().nextBool()) {
-          _activeNodes = 40 + math.Random().nextInt(6); // Entre 40 et 45
+          _activeNodes = 40 + math.Random().nextInt(6);
         }
       });
     });
@@ -329,7 +349,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return ClipRect( // 👈 CORRECTION CRITIQUE : Empêche le flou de baver sur la barre latérale !
+    return ClipRect(
       child: Stack(
         children: [
           // --- 1. ARRIÈRE-PLAN : GRILLE CYBER ---
@@ -372,10 +392,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                   return Transform.translate(
                     offset: Offset(0, dy),
                     child: Opacity(
-                      opacity: 0.05, // Effet filigrane (Watermark)
+                      opacity: 0.05,
                       child: Center(
                         child: Image.asset(
-                          'assets/Logo_principal.png', // 👈 CHEMIN CORRIGÉ VERS TON LOGO DANS ASSETS
+                          'assets/Logo_principal.png',
                           width: 500,
                           height: 500,
                           fit: BoxFit.contain,
@@ -392,7 +412,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
             ),
           ),
 
-          // FILTRE DE VERRE DÉPOLI (Contenu dans le ClipRect, ne floute pas la sidebar)
+          // FILTRE DE VERRE DÉPOLI
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(color: Colors.transparent),
@@ -409,6 +429,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header Status
                       Row(
                         children: [
                           Container(

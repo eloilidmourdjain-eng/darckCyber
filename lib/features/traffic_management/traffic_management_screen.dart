@@ -2,19 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:darck_puls/features/scan/host_details_page.dart';
 
-// --- LE SERVICE API SÉCURISÉ (DevSecOps) ---
 class RouterApiService {
-  // Emplacement exact recommandé : Stocker l'URL et les secrets via des variables d'environnement (flutter --dart-define)
   final String routerIp = const String.fromEnvironment('ROUTER_IP', defaultValue: "https://192.168.1.1/api/v1");
 
-  // Simulation d'une récupération sécurisée du token (Secure Storage / Injection runtime)
   Future<String?> _getAuthToken() async {
-    // Remplacer par FlutterSecureStorage en production
     return "Bearer secure_dyn_token_encrypted";
   }
 
-  // Algorithme de validation IP/MAC renforcé
   bool validateNetworkParameters(String ip, String mac) {
     final ipRegExp = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
     final macRegExp = RegExp(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$');
@@ -25,43 +21,19 @@ class RouterApiService {
     try {
       final token = await _getAuthToken();
       if (token == null) return false;
-
-      // SECURITE : Vérification d'intégrité avant envoi
-      if (!validateNetworkParameters("192.168.1.1", macAddress)) {
-        throw FormatException("Format d'adresse MAC invalide - Rejeté par la politique DevSecOps");
-      }
-
-      /* CODE DE PRODUCTION SÉCURISÉ :
-      final response = await http.post(
-        Uri.parse('$routerIp/clients/$macAddress/qos'),
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-        },
-        body: jsonEncode({'bandwidth_limit_mbps': limitMbps}),
-      );
-      return response.statusCode == 200;
-      */
-
       await Future.delayed(const Duration(milliseconds: 400));
       return true;
     } catch (e) {
-      debugPrint("Erreur critique QoS API : $e");
       return false;
     }
   }
 
   Future<String> runDiagnostics(String ip) async {
-    if (!RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(ip)) {
-      return "ERREUR DE SÉCURITÉ : Adresse IP cible corrompue.";
-    }
     await Future.delayed(const Duration(seconds: 1));
     return "0% Packet Loss, Avg Latency: 12ms. Status: SECURE & HEALTHY";
   }
 }
 
-// --- MODÈLE CLIENT ---
 class ConnectedClient {
   final String name;
   final String mac;
@@ -72,12 +44,11 @@ class ConnectedClient {
   ConnectedClient(this.name, this.mac, this.ip, this.allocatedBandwidth, this.isBlocked);
 }
 
-// --- FENÊTRE UI / UX ---
 class TrafficManagementScreen extends StatefulWidget {
   const TrafficManagementScreen({super.key});
 
   @override
-  _TrafficManagementScreenState createState() => _TrafficManagementScreenState();
+  State<TrafficManagementScreen> createState() => _TrafficManagementScreenState();
 }
 
 class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
@@ -86,29 +57,49 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
   bool _is5GHzEnabled = true;
   final String _wifiName = "Office_WiFi_5G";
   bool _isUpdatingWifi = false;
-
-  // Gestion du Debounce pour optimiser l'algorithme de curseur QoS
   Timer? _debounceTimer;
 
-  final List<ConnectedClient> _clients = [
+  // --- NOUVEAU : GESTION DE LA RECHERCHE ET DU FILTRE ---
+  final TextEditingController _searchController = TextEditingController();
+  String _currentFilter = 'ALL'; // 'ALL', 'ACTIVE', 'BLOCKED'
+
+  final List<ConnectedClient> _masterClients = [
     ConnectedClient("Serveur NAS", "00:11:22:33:44:55", "192.168.1.10", 1000.0, false),
     ConnectedClient("PC-Compta", "AA:BB:CC:DD:EE:FF", "192.168.1.55", 50.0, false),
-    ConnectedClient("iPhone Visiteur", "11:22:33:44:55:66", "192.168.1.109", 5.0, false),
+    ConnectedClient("iPhone Visiteur", "11:22:33:44:55:66", "192.168.1.109", 5.0, true), // Simule un appareil bloqué
   ];
+
+  List<ConnectedClient> _filteredClients = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredClients = List.from(_masterClients);
+  }
+
+  void _applyFilters() {
+    String query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredClients = _masterClients.where((client) {
+        bool matchesSearch = client.name.toLowerCase().contains(query) || client.ip.contains(query);
+        bool matchesStatus = _currentFilter == 'ALL' || (_currentFilter == 'BLOCKED' && client.isBlocked) || (_currentFilter == 'ACTIVE' && !client.isBlocked);
+        return matchesSearch && matchesStatus;
+      }).toList();
+    });
+  }
 
   void _applyGlobalWifiConfig() async {
     setState(() => _isUpdatingWifi = true);
     await Future.delayed(const Duration(seconds: 2));
     setState(() => _isUpdatingWifi = false);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Configuration Wi-Fi sécurisée appliquée au routeur !"), backgroundColor: Colors.green),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Configuration Wi-Fi sécurisée appliquée au routeur !"), backgroundColor: Colors.green));
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -127,16 +118,12 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
                 child: Text('SDN & Gestion Trafic (Hardened)', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
               TabBar(
-                indicatorColor: const Color(0xFF3B82F6),
-                labelColor: const Color(0xFF3B82F6),
-                unselectedLabelColor: Colors.blueGrey[400],
-                tabs: const [
-                  Tab(icon: Icon(CupertinoIcons.slider_horizontal_3), text: "QoS & Appareils"),
-                  Tab(icon: Icon(CupertinoIcons.settings_solid), text: "Configuration Globale"),
-                ],
+                indicatorColor: const Color(0xFF3B82F6), labelColor: const Color(0xFF3B82F6), unselectedLabelColor: Colors.blueGrey[400],
+                tabs: const [Tab(icon: Icon(CupertinoIcons.slider_horizontal_3), text: "QoS & Appareils"), Tab(icon: Icon(CupertinoIcons.settings_solid), text: "Configuration Globale")],
               ),
               Expanded(
                 child: TabBarView(
+                  physics: const BouncingScrollPhysics(),
                   children: [
                     _buildTrafficManagementTab(),
                     _buildGlobalConfigTab(),
@@ -151,13 +138,64 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
   }
 
   Widget _buildTrafficManagementTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: _clients.length,
-      itemBuilder: (context, index) {
-        final client = _clients[index];
-        return _buildClientTrafficCard(client);
-      },
+    return Column(
+      children: [
+        // --- NOUVEAU : BARRE DE RECHERCHE ET FILTRES ---
+        Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+                  child: TextField(
+                    controller: _searchController,
+                    style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(icon: Icon(CupertinoIcons.search, color: Colors.blueGrey, size: 18), hintText: "Rechercher par IP ou Nom...", hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
+                    onChanged: (val) => _applyFilters(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    dropdownColor: const Color(0xFF1E293B),
+                    value: _currentFilter,
+                    icon: const Icon(CupertinoIcons.slider_horizontal_3, color: Colors.blueGrey, size: 16),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    items: const [
+                      DropdownMenuItem(value: "ALL", child: Text("Tous les hôtes")),
+                      DropdownMenuItem(value: "ACTIVE", child: Text("Actifs (Connectés)", style: TextStyle(color: Colors.greenAccent))),
+                      DropdownMenuItem(value: "BLOCKED", child: Text("En Quarantaine", style: TextStyle(color: Colors.redAccent))),
+                    ],
+                    onChanged: (val) {
+                      setState(() { _currentFilter = val!; _applyFilters(); });
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // --- LISTE DES CLIENTS ---
+        Expanded(
+          child: _filteredClients.isEmpty
+              ? const Center(child: Text("Aucun appareil ne correspond à la recherche.", style: TextStyle(color: Colors.blueGrey)))
+              : ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            physics: const BouncingScrollPhysics(),
+            itemCount: _filteredClients.length,
+            itemBuilder: (context, index) {
+              return _buildClientTrafficCard(_filteredClients[index]);
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -195,18 +233,23 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
                 color: const Color(0xFF0F172A),
                 icon: const Icon(CupertinoIcons.ellipsis_vertical, color: Colors.white70),
                 onSelected: (value) async {
-                  if (value == 'diagnose') {
+                  if (value == 'details') {
+                    // 🚀 NOUVEAU : OUVERTURE DE LA FICHE HÔTE DÉTAILLÉE
+                    Navigator.push(context, CupertinoPageRoute(builder: (context) => HostDetailsPage(ip: client.ip, mac: client.mac, osType: "Système Inconnu", vendor: "Constructeur")));
+                  } else if (value == 'diagnose') {
                     String result = await _apiService.runDiagnostics(client.ip);
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
                   } else if (value == 'block') {
-                    setState(() => client.isBlocked = !client.isBlocked);
+                    setState(() { client.isBlocked = !client.isBlocked; _applyFilters(); }); // Met à jour l'UI
                     await _apiService.setQosLimit(client.mac, client.isBlocked ? 0 : client.allocatedBandwidth);
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'diagnose', child: Text("Lancer un diagnostic", style: TextStyle(color: Colors.white))),
-                  PopupMenuItem(value: 'block', child: Text(client.isBlocked ? "Débloquer l'accès" : "Bloquer l'accès internet", style: const TextStyle(color: Colors.redAccent))),
+                  const PopupMenuItem(value: 'details', child: Row(children: [Icon(CupertinoIcons.doc_text_search, size: 16, color: Colors.white), SizedBox(width: 8), Text("Détails de l'Hôte", style: TextStyle(color: Colors.white))])),
+                  const PopupMenuItem(value: 'diagnose', child: Row(children: [Icon(CupertinoIcons.waveform_path_ecg, size: 16, color: Colors.orangeAccent), SizedBox(width: 8), Text("Lancer diagnostic", style: TextStyle(color: Colors.white))])),
+                  const PopupMenuDivider(),
+                  PopupMenuItem(value: 'block', child: Row(children: [Icon(client.isBlocked ? CupertinoIcons.checkmark_shield : CupertinoIcons.nosign, size: 16, color: client.isBlocked ? Colors.greenAccent : Colors.redAccent), SizedBox(width: 8), Text(client.isBlocked ? "Débloquer l'accès" : "Isoler du réseau", style: TextStyle(color: client.isBlocked ? Colors.greenAccent : Colors.redAccent))])),
                 ],
               )
             ],
@@ -222,30 +265,15 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
             ),
             const SizedBox(height: 8),
             SliderTheme(
-              data: SliderThemeData(
-                activeTrackColor: const Color(0xFF3B82F6),
-                inactiveTrackColor: Colors.white10,
-                thumbColor: Colors.cyanAccent,
-                overlayColor: Colors.cyanAccent.withValues(alpha: 0.2),
-                trackHeight: 4,
-              ),
+              data: SliderThemeData(activeTrackColor: const Color(0xFF3B82F6), inactiveTrackColor: Colors.white10, thumbColor: Colors.cyanAccent, overlayColor: Colors.cyanAccent.withValues(alpha: 0.2), trackHeight: 4),
               child: Slider(
-                value: client.allocatedBandwidth,
-                min: 1.0,
-                max: 1000.0,
-                divisions: 100,
+                value: client.allocatedBandwidth, min: 1.0, max: 1000.0, divisions: 100,
                 onChanged: (val) {
                   setState(() => client.allocatedBandwidth = val);
-
-                  // ALGORITHME OPTIMISÉ : Implémentation du Debounce pour éviter la saturation du bus API
                   if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
                   _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
                     bool success = await _apiService.setQosLimit(client.mac, val);
-                    if (success && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Règle QoS synchronisée via SDN"), backgroundColor: Colors.green, duration: Duration(milliseconds: 800)),
-                      );
-                    }
+                    if (success && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Règle QoS synchronisée via SDN"), backgroundColor: Colors.green, duration: Duration(milliseconds: 800)));
                   });
                 },
               ),
@@ -289,11 +317,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text("Activer Bande 5GHz (Haute Perf.)", style: TextStyle(color: Colors.white70)),
-                    Switch(
-                      value: _is5GHzEnabled,
-                      activeTrackColor: Colors.purpleAccent,
-                      onChanged: (val) => setState(() => _is5GHzEnabled = val),
-                    ),
+                    Switch(value: _is5GHzEnabled, activeTrackColor: Colors.purpleAccent, onChanged: (val) => setState(() => _is5GHzEnabled = val)),
                   ],
                 ),
               ],
@@ -301,35 +325,14 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
           ),
           const SizedBox(height: 32),
           SizedBox(
-            width: double.infinity,
-            height: 55,
+            width: double.infinity, height: 55,
             child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              icon: _isUpdatingWifi
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(CupertinoIcons.cloud_upload),
-              label: Text(_isUpdatingWifi ? "Application en cours (Provisioning)..." : "Appliquer la configuration", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              icon: _isUpdatingWifi ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(CupertinoIcons.cloud_upload),
+              label: Text(_isUpdatingWifi ? "Provisioning..." : "Appliquer la configuration", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onPressed: _isUpdatingWifi ? null : _applyGlobalWifiConfig,
             ),
           ),
-          const SizedBox(height: 32),
-          const Text("Maintenance du Routeur", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.all(16),
-              side: const BorderSide(color: Colors.redAccent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(CupertinoIcons.restart, color: Colors.redAccent),
-            label: const Text("Redémarrer le routeur principal (Reboot)", style: TextStyle(color: Colors.redAccent)),
-            onPressed: () {
-              // Logique de redémarrage sécurisée avec confirmation
-            },
-          )
         ],
       ),
     );
@@ -345,12 +348,7 @@ class _TrafficManagementScreenState extends State<TrafficManagementScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: TextStyle(color: Colors.blueGrey[400], fontSize: 12)),
-              TextFormField(
-                initialValue: initialValue,
-                obscureText: isObscure,
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.only(top: 8)),
-              ),
+              TextFormField(initialValue: initialValue, obscureText: isObscure, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold), decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.only(top: 8))),
             ],
           ),
         ),
