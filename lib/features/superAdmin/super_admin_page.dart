@@ -4,11 +4,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 
+// ⚠️ IMPORTS DE TON ARCHITECTURE
 import 'package:darck_puls/features/superAdmin/cyber_tools/widgets/defense_dashboard.dart';
 import 'package:darck_puls/features/superAdmin/cyber_tools/widgets/offensive_panel.dart';
 import 'package:darck_puls/features/superAdmin/screens/honeypot_monitor_page.dart';
 
-// --- NOUVEAU MODÈLE POUR LE BASTION LINUX ---
+// 🚀 NOUVEL IMPORT : Le module IAM pour gérer les utilisateurs
+import 'package:darck_puls/features/superAdmin/screens/iam_management_screen.dart';
+
+// --- MODÈLE POUR LE BASTION LINUX ---
 class LinuxBastionNode {
   final String name;
   final String ip;
@@ -42,7 +46,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   bool _isVgpuBoostEnabled = true;
   bool _isHoneypotDefenseArmed = true;
 
-  // État du Bastion Linux (Nouvel Onglet 4)
+  // État du Bastion Linux (Onglet 4)
   final List<LinuxBastionNode> _bastionNodes = [];
   final List<String> _bastionAuditLogs = [];
   final TextEditingController _sshCommandController = TextEditingController();
@@ -50,7 +54,8 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    // 🚀 PASSAGE À 5 ONGLETS POUR INCLURE LE MODULE IAM
+    _tabController = TabController(length: 5, vsync: this);
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
 
     // Ajout d'une machine simulée pour le design
@@ -78,12 +83,13 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(), // Désactive le swipe manuel
                 children: [
-                  _buildBlueTeamSocTab(),    // 1. SOC, SIEM, vGPU, n8n
-                  _buildDeceptionTab(),      // 2. Honeypots & Pièges
-                  _buildOffensiveTab(),      // 3. Outils Offensifs (Pentest)
-                  _buildLinuxBastionTab(),   // 4. NOUVEAU: Pont Linux / Bastion Audit
+                  _buildBlueTeamSocTab(),      // 1. SOC, SIEM, vGPU, n8n
+                  _buildDeceptionTab(),        // 2. Honeypots & Pièges
+                  _buildOffensiveTab(),        // 3. Outils Offensifs (Pentest)
+                  _buildLinuxBastionTab(),     // 4. Pont Linux / Bastion Audit
+                  const IamManagementScreen(), // 5. 🚀 NOUVEAU: GESTION DES UTILISATEURS IAM
                 ],
               ),
             ),
@@ -157,7 +163,8 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
               Tab(child: Row(children: [Icon(CupertinoIcons.shield_lefthalf_fill, size: 16), SizedBox(width: 8), Text("SOC & Infra")])),
               Tab(child: Row(children: [Icon(CupertinoIcons.cube_box_fill, size: 16), SizedBox(width: 8), Text("Honeypots")])),
               Tab(child: Row(children: [Icon(CupertinoIcons.flame_fill, size: 16), SizedBox(width: 8), Text("Red Team")])),
-              Tab(child: Row(children: [Icon(CupertinoIcons.link, size: 16), SizedBox(width: 8), Text("Pont Linux")])), // Onglet modifié
+              Tab(child: Row(children: [Icon(CupertinoIcons.link, size: 16), SizedBox(width: 8), Text("Pont Linux")])),
+              Tab(child: Row(children: [Icon(CupertinoIcons.group_solid, size: 16), SizedBox(width: 8), Text("IAM Users")])), // 🚀 NOUVEL ONGLET
             ],
           ),
         ),
@@ -301,7 +308,6 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   // ONGLET 4 : LE PONT LINUX (BASTION HOST)
   // ==========================================
   Widget _buildLinuxBastionTab() {
-    // Vérification de la plateforme (Mobile vs Desktop)
     bool isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
     return Column(
@@ -330,7 +336,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
                 ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.withValues(alpha: 0.2), foregroundColor: Colors.greenAccent),
                     onPressed: () {
-                      // Logique pour ajouter une machine (Ouvre un modal pour IP/User/Clé)
+                      // Logique pour ajouter une machine
                     },
                     icon: const Icon(CupertinoIcons.add, size: 14),
                     label: const Text("Associer Node")
@@ -340,7 +346,6 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           ),
         ),
 
-        // Liste des machines connectées
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: ListView.builder(
@@ -374,7 +379,6 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
           ),
         ),
 
-        // Zone d'exécution (Différente selon Desktop ou Mobile)
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -385,7 +389,6 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
     );
   }
 
-  // --- RENDU MOBILE : TERMINAL D'AUDIT SÉCURISÉ ---
   Widget _buildMobileBastionTerminal() {
     return Container(
       decoration: BoxDecoration(
@@ -441,14 +444,13 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
     );
   }
 
-  // --- RENDU DESKTOP : INSTRUCTIONS (Pas de terminal natif dans l'app) ---
   Widget _buildDesktopBastionInstructions() {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: kCardColor.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05), style: BorderStyle.solid),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05), style: BorderStyle.solid), // 👈 CORRECTION SÉCURITÉ ICI (solid)
       ),
       child: Center(
         child: Column(
