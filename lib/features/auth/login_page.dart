@@ -4,10 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pinput/pinput.dart';
 
+// --- IMPORTS METIERS ---
 import 'package:darck_puls/features/dashboard/dashboard_page.dart'; // Le MainNavigationScreen
 import 'package:darck_puls/core/models/user_role.dart';
-
-// 🚀 IMPORTS DEVSECOPS : Base de données et Onboarding
 import 'package:darck_puls/core/local_auth_db.dart'; // 👈 Ton gestionnaire SQLite
 import 'package:darck_puls/features/auth/profile_completion_screen.dart'; // 👈 L'écran de configuration du profil
 
@@ -82,13 +81,16 @@ class _LoginPageState extends State<LoginPage> {
         : UserRole.simpleAdmin;
 
     // DEVSECOPS : Onboarding Enforcement (Blocage si profil incomplet)
-    if (isFirstLogin && role == UserRole.simpleAdmin) {
+    if (isFirstLogin) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profil incomplet. Configuration requise."), backgroundColor: Colors.orangeAccent, behavior: SnackBarBehavior.floating)
       );
 
       // Ouvre l'écran obligatoire de configuration de profil
-      Navigator.pushReplacement(context, CupertinoPageRoute(builder: (_) => const ProfileCompletionScreen()));
+      Navigator.pushReplacement(context, CupertinoPageRoute(builder: (_) => ProfileCompletionScreen(
+        userEmail: _authenticatedUser!['email'],
+        role: role,
+      )));
     } else {
       // Connexion standard autorisée
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
 
-      // Redirection vers le Dashboard
+      // Redirection vers le Dashboard principal
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -161,9 +163,10 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 🚀 TON LOGO EST ICI
             Image.asset(
               'assets/Logo_principal.png',
-              height: 60,
+              height: 70,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
             ),
@@ -255,9 +258,10 @@ class _LoginPageState extends State<LoginPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 🚀 TON LOGO EST ICI AUSSI
           Image.asset(
             'assets/Logo_principal.png',
-            height: 60,
+            height: 70,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
           ),
@@ -284,8 +288,7 @@ class _LoginPageState extends State<LoginPage> {
             defaultPinTheme: defaultPinTheme,
             focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
             onCompleted: (pin) {
-              // En production : On enverrait ce PIN au serveur pour validation.
-              // Ici on simule une vérification réussie :
+              // En production, vérifier si le PIN saisi correspond au token généré par le SuperAdmin
               if (pin == "123456") {
                 _grantAccess();
               } else {

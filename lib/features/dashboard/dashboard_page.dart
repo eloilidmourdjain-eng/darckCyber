@@ -6,9 +6,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:darck_puls/features/auth/login_page.dart';
-import 'package:darck_puls/core/models/user_role.dart';
 
-// --- IMPORTATION DE TOUTES TES FENÊTRES MÉTIERS ---
+import 'package:darck_puls/core/models/user_role.dart';
 import 'package:darck_puls/features/scan/network_scan_page.dart';
 import 'package:darck_puls/features/network_analysis/wifi_analyzer_screen.dart';
 import 'package:darck_puls/features/security/security_alerts_screen.dart';
@@ -16,9 +15,10 @@ import 'package:darck_puls/features/topology/ai_topology_screen.dart';
 import 'package:darck_puls/features/traffic_management/traffic_management_screen.dart';
 import 'package:darck_puls/features/provisioning/architecture_provisioning_screen.dart';
 import 'package:darck_puls/features/maintenance/maintenance_screen.dart';
+import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 import 'package:darck_puls/features/logs/log_center_screen.dart';
 import 'package:darck_puls/features/settings/system_settings_screen.dart';
-import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
+
 
 class MainNavigationScreen extends StatefulWidget {
   final UserRole role;
@@ -29,22 +29,23 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
 
   late List<Widget> _screens;
   late List<NavigationItem> _navItems;
+  late AnimationController _pulseController; // 🚀 NOUVEAU: Contrôleur pour le Logo
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
     _initializeMenu();
   }
 
   void _initializeMenu() {
-    // 1. Liste des fenêtres communes (Pour tous les administrateurs)
     _screens = [
-      const HomeSummaryView(), // 🚀 L'ÉCRAN D'ACCUEIL DYNAMIQUE
+      const HomeSummaryView(),
       const NetworkScanPage(),
       const WifiAnalyzerScreen(),
       const SecurityAlertsScreen(),
@@ -69,9 +70,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       NavigationItem(icon: CupertinoIcons.settings, label: "Réglages"),
     ];
 
-    // 2. PRIVILÈGE SUPER ADMIN : Ajout de la Console Restreinte
     if (widget.role == UserRole.superAdmin) {
-      _screens.add(const SuperAdminToolsPage()); // La War Room
+      _screens.add(const SuperAdminToolsPage());
       _navItems.add(NavigationItem(
           icon: CupertinoIcons.flame_fill,
           label: "Root Console",
@@ -80,16 +80,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
   // --- PROTOCOLE DE DÉCONNEXION SÉCURISÉE (DevSecOps) ---
   void _executeSecureLogout(BuildContext context) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Empêche de cliquer à côté
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        // Lancement de la séquence de destruction en arrière-plan
         Future.delayed(const Duration(seconds: 2), () {
           if (!context.mounted) return;
-          // Purge de l'historique de navigation et retour au login
           Navigator.pushAndRemoveUntil(
             context,
             CupertinoPageRoute(builder: (_) => const LoginPage()),
@@ -97,7 +101,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           );
         });
 
-        // Interface UI du nettoyage de session (Glassmorphism)
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
           child: Dialog(
@@ -142,7 +145,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           backgroundColor: const Color(0xFF070B14),
           body: Row(
             children: [
-              if (isDesktop) _buildDesktopSidebar(context),
+              if (isDesktop) _buildDesktopSidebar(),
               Expanded(
                 child: Stack(
                   children: [
@@ -167,7 +170,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Widget _buildDesktopSidebar(BuildContext context) {
+  Widget _buildDesktopSidebar() {
     return Container(
       width: 100,
       decoration: BoxDecoration(
@@ -178,6 +181,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       child: Column(
         children: [
           const SizedBox(height: 40),
+
+          // 🚀 LOGO STATIQUE (Pas besoin de le faire pulser ici, c'est juste le header du menu)
           Container(
             width: 55,
             height: 55,
@@ -188,7 +193,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))
             ),
             child: Image.asset(
-              'assets/logo.png',
+              'assets/Logo_principal.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(
                   CupertinoIcons.waveform_path_ecg,
@@ -251,7 +256,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             child: IconButton(
               icon: const Icon(CupertinoIcons.power, color: Colors.redAccent, size: 28),
               tooltip: "Déconnexion Sécurisée",
-              onPressed: () => _executeSecureLogout(context), // 🚀 Appel de la déconnexion sécurisée
+              onPressed: () => _executeSecureLogout(context),
             ),
           ),
         ],
@@ -332,7 +337,7 @@ class NavigationItem {
 }
 
 // =====================================================================
-// ÉCRAN D'ACCUEIL : HOME SUMMARY (Animé, Dynamique, Logo Asset)
+// ÉCRAN D'ACCUEIL : HOME SUMMARY
 // =====================================================================
 class HomeSummaryView extends StatefulWidget {
   const HomeSummaryView({super.key});
@@ -348,7 +353,6 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // --- VARIABLES DYNAMIQUES POUR LES CARTES ---
   Timer? _liveDataTimer;
   int _threatsBlocked = 1204;
   int _activeNodes = 42;
@@ -366,12 +370,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
 
     _entryController.forward();
 
-    // 🚀 MOTEUR DE DONNÉES EN TEMPS RÉEL
     _liveDataTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (!mounted) return;
       setState(() {
         _threatsBlocked += math.Random().nextInt(4);
-
         if (math.Random().nextBool()) {
           _activeNodes = 40 + math.Random().nextInt(6);
         }
@@ -395,13 +397,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
     return ClipRect(
       child: Stack(
         children: [
-          // --- 1. ARRIÈRE-PLAN : GRILLE CYBER ---
           CustomPaint(
             size: Size(size.width, size.height),
             painter: CyberGridPainter(color: Colors.white.withValues(alpha: 0.03)),
           ),
-
-          // --- 2. ARRIÈRE-PLAN : ORBES LUMINEUSES ---
           AnimatedBuilder(
               animation: _orbController,
               builder: (context, child) {
@@ -424,8 +423,6 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                 );
               }
           ),
-
-          // --- 3. ARRIÈRE-PLAN : TON LOGO (Lévitation) ---
           Positioned.fill(
             child: AnimatedBuilder(
                 animation: _bgLogoController,
@@ -438,7 +435,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                       opacity: 0.04,
                       child: Center(
                         child: Image.asset(
-                          'assets/logo.png',
+                          'assets/Logo_principal.png',
                           width: 500,
                           height: 500,
                           fit: BoxFit.contain,
@@ -454,14 +451,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                 }
             ),
           ),
-
-          // FILTRE DE VERRE DÉPOLI
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(color: Colors.transparent),
           ),
-
-          // --- 4. CONTENU PRINCIPAL (Cartes Dynamiques) ---
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
@@ -472,7 +465,6 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header Status
                       Row(
                         children: [
                           Container(
@@ -492,7 +484,6 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                       ),
                       const SizedBox(height: 48),
 
-                      // Grid des statistiques rapides (NOC)
                       const Text("VUE D'ENSEMBLE (LIVE NOC)", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       const SizedBox(height: 16),
                       LayoutBuilder(
@@ -516,12 +507,11 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
 
                       const SizedBox(height: 48),
 
-                      // Activités récentes
                       const Text("ACTIVITÉ RÉCENTE", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       const SizedBox(height: 16),
                       _buildActivityRow("Télémétrie IA : Aucune dérive critique détectée.", "En direct", CupertinoIcons.waveform_path_ecg),
                       _buildActivityRow("Synchronisation GitOps (Vault) réussie.", "Il y a 5 min", CupertinoIcons.cloud_upload),
-                      _buildActivityRow("Nouvel accès Administrateur.", "Il y a 45 min", CupertinoIcons.person_alt),
+                      _buildActivityRow("Analyse Wi-Fi de routine terminée.", "Il y a 12 min", CupertinoIcons.wifi),
                     ],
                   ),
                 ),

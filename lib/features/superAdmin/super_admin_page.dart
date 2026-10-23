@@ -4,15 +4,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 
-// ⚠️ IMPORTS DE TON ARCHITECTURE
 import 'package:darck_puls/features/superAdmin/cyber_tools/widgets/defense_dashboard.dart';
 import 'package:darck_puls/features/superAdmin/cyber_tools/widgets/offensive_panel.dart';
 import 'package:darck_puls/features/superAdmin/screens/honeypot_monitor_page.dart';
-
-// 🚀 NOUVEL IMPORT : Le module IAM pour gérer les utilisateurs
 import 'package:darck_puls/features/superAdmin/screens/iam_management_screen.dart';
 
-// --- MODÈLE POUR LE BASTION LINUX ---
 class LinuxBastionNode {
   final String name;
   final String ip;
@@ -31,7 +27,6 @@ class SuperAdminToolsPage extends StatefulWidget {
 }
 
 class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerProviderStateMixin {
-  // --- THÈME CYBER ROOT (Red Alert) ---
   final Color kBackgroundColor = const Color(0xFF05000A);
   final Color kCardColor = const Color(0xFF130B1C);
   final Color kRootColor = const Color(0xFFFF2A55);
@@ -39,14 +34,12 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   final Color kRed = const Color(0xFFFF2A55);
 
   late TabController _tabController;
-  late AnimationController _pulseController;
+  late AnimationController _pulseController; // 🚀 ON GARDE L'ANIMATION POUR LE LOGO
 
-  // États des daemons d'infrastructure
   bool _isN8nActive = true;
   bool _isVgpuBoostEnabled = true;
   bool _isHoneypotDefenseArmed = true;
 
-  // État du Bastion Linux (Onglet 4)
   final List<LinuxBastionNode> _bastionNodes = [];
   final List<String> _bastionAuditLogs = [];
   final TextEditingController _sshCommandController = TextEditingController();
@@ -54,11 +47,9 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
   @override
   void initState() {
     super.initState();
-    // 🚀 PASSAGE À 5 ONGLETS POUR INCLURE LE MODULE IAM
     _tabController = TabController(length: 5, vsync: this);
     _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
 
-    // Ajout d'une machine simulée pour le design
     _bastionNodes.add(LinuxBastionNode("Kali-Ops-01", "10.0.0.99", "root", "Kali Linux", isConnected: true));
     _bastionAuditLogs.add("[SYS] Authentification par clé réussie vers 10.0.0.99");
   }
@@ -83,13 +74,13 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(), // Désactive le swipe manuel
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildBlueTeamSocTab(),      // 1. SOC, SIEM, vGPU, n8n
-                  _buildDeceptionTab(),        // 2. Honeypots & Pièges
-                  _buildOffensiveTab(),        // 3. Outils Offensifs (Pentest)
-                  _buildLinuxBastionTab(),     // 4. Pont Linux / Bastion Audit
-                  const IamManagementScreen(), // 5. 🚀 NOUVEAU: GESTION DES UTILISATEURS IAM
+                  _buildBlueTeamSocTab(),
+                  _buildDeceptionTab(),
+                  _buildOffensiveTab(),
+                  _buildLinuxBastionTab(),
+                  const IamManagementScreen(),
                 ],
               ),
             ),
@@ -116,12 +107,36 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
             icon: const Icon(CupertinoIcons.back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
+
+          // 🚀 CORRECTION : TON LOGO REMPLACE L'ICONE DE PULSATION !
           AnimatedBuilder(
               animation: _pulseController,
               builder: (context, child) {
-                return Icon(CupertinoIcons.radiowaves_right, color: kRootColor.withValues(alpha: _pulseController.value), size: 24);
+                return Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: kRootColor.withValues(alpha: _pulseController.value * 0.6),
+                        blurRadius: 15 * _pulseController.value,
+                        spreadRadius: 2 * _pulseController.value,
+                      )
+                    ],
+                  ),
+                  child: Opacity(
+                    opacity: 0.6 + (_pulseController.value * 0.4),
+                    child: Image.asset(
+                      'assets/Logo_principal.png',
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.waveform_path_ecg, color: kRootColor, size: 28),
+                    ),
+                  ),
+                );
               }
           ),
+
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,7 +179,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
               Tab(child: Row(children: [Icon(CupertinoIcons.cube_box_fill, size: 16), SizedBox(width: 8), Text("Honeypots")])),
               Tab(child: Row(children: [Icon(CupertinoIcons.flame_fill, size: 16), SizedBox(width: 8), Text("Red Team")])),
               Tab(child: Row(children: [Icon(CupertinoIcons.link, size: 16), SizedBox(width: 8), Text("Pont Linux")])),
-              Tab(child: Row(children: [Icon(CupertinoIcons.group_solid, size: 16), SizedBox(width: 8), Text("IAM Users")])), // 🚀 NOUVEL ONGLET
+              Tab(child: Row(children: [Icon(CupertinoIcons.group_solid, size: 16), SizedBox(width: 8), Text("IAM Users")])),
             ],
           ),
         ),
@@ -450,7 +465,7 @@ class _SuperAdminToolsPageState extends State<SuperAdminToolsPage> with TickerPr
       decoration: BoxDecoration(
         color: kCardColor.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05), style: BorderStyle.solid), // 👈 CORRECTION SÉCURITÉ ICI (solid)
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05), style: BorderStyle.solid),
       ),
       child: Center(
         child: Column(
