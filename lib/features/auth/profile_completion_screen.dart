@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:darck_puls/core/models/user_role.dart';
 import 'package:darck_puls/features/dashboard/dashboard_page.dart';
-import 'package:darck_puls/core/local_auth_db.dart'; // 👈 La base de données
+import 'package:darck_puls/core/firebase_auth_service.dart'; // 👈 Remplacement par le service Firebase
 
 class ProfileCompletionScreen extends StatefulWidget {
   final String userEmail;
@@ -22,7 +22,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final Color kCyan = const Color(0xFF00E5FF);
 
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController(); // Pour faire réaliste
+  final TextEditingController _phoneController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -37,18 +37,27 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // 1. Appel à la base de données pour mettre à jour le mot de passe et valider l'onboarding
-      await LocalAuthDatabase.instance.completeUserProfile(
-          widget.userEmail,
-          _passwordController.text.trim()
-      );
+      try {
+        // 1. 🚀 Mise à jour du mot de passe et du statut dans Firebase
+        await FirebaseAuthService.instance.completeUserProfile(
+            widget.userEmail,
+            _passwordController.text.trim()
+        );
 
-      await Future.delayed(const Duration(seconds: 1)); // Petit délai UX
+        if (!mounted) return;
 
-      if (!mounted) return;
-
-      // 2. Redirection vers le Dashboard avec le VRAI rôle (Root ou Simple)
-      Navigator.pushReplacement(context, CupertinoPageRoute(builder: (_) => MainNavigationScreen(role: widget.role)));
+        // 2. Redirection vers le Dashboard avec le rôle approprié
+        Navigator.pushReplacement(
+            context,
+            CupertinoPageRoute(builder: (_) => MainNavigationScreen(role: widget.role))
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Erreur lors de la mise à jour : $e"), backgroundColor: Colors.redAccent)
+        );
+      }
     }
   }
 
@@ -92,7 +101,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // UPLOAD PHOTO (Simulation visuelle)
                   Stack(
                     alignment: Alignment.bottomRight,
                     children: [
@@ -115,7 +123,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: themeColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                       icon: _isLoading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(CupertinoIcons.check_mark_circled_solid, size: 18),
-                      label: Text(_isLoading ? "SAUVEGARDE EN BDD..." : "SCELLER LE PROFIL ET ACCÉDER", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(_isLoading ? "SAUVEGARDE DANS FIREBASE..." : "SCELLER LE PROFIL ET ACCÉDER", style: const TextStyle(fontWeight: FontWeight.bold)),
                       onPressed: _isLoading ? null : _saveProfile,
                     ),
                   )
@@ -134,7 +142,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       obscureText: isPassword,
       style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 13),
       validator: (val) {
-        if (isPassword && val!.length < 6) return "Le mot de passe doit faire au moins 6 caractères";
+        if (isPassword && (val == null || val.length < 6)) return "Le mot de passe doit faire au moins 6 caractères";
         return null;
       },
       decoration: InputDecoration(

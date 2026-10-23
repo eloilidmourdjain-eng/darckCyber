@@ -32,6 +32,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    buildscript {
+        dependencies {
+            classpath 'com.google.gms:google-services:4.4.2'
+        }
+    }
 }
 
 kotlin {
@@ -43,3 +49,5 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+apply plugin: 'com.google.gms.google-services'

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "960567252120",
+    "project_id": "com-darckpuls-darckcyber",
+    "storage_bucket": "com-darckpuls-darckcyber.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:960567252120:android:c3eb68d0fcf523a9fbaced",
+        "android_client_info": {
+          "package_name": "com.darckplus.darckcyber"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATaZiQoutlMYa3wqBZnc3YG14CsRSWRO4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

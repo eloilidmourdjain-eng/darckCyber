@@ -7,7 +7,7 @@ import 'package:pinput/pinput.dart';
 // --- IMPORTS METIERS ---
 import 'package:darck_puls/features/dashboard/dashboard_page.dart'; // Le MainNavigationScreen
 import 'package:darck_puls/core/models/user_role.dart';
-import 'package:darck_puls/core/local_auth_db.dart'; // 👈 Ton gestionnaire SQLite
+import 'package:darck_puls/core/firebase_auth_service.dart'; // 👈 Remplacement par le service Firebase
 import 'package:darck_puls/features/auth/profile_completion_screen.dart'; // 👈 L'écran de configuration du profil
 
 class LoginPage extends StatefulWidget {
@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _show2FAStep = false;
   bool _isLoading = false;
 
-  // L'utilisateur authentifié en mémoire (provenant de SQLite)
+  // L'utilisateur authentifié en mémoire (provenant de Firestore)
   Map<String, dynamic>? _authenticatedUser;
 
   final TextEditingController _usernameController = TextEditingController();
@@ -38,13 +38,13 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // --- ÉTAPE 1 : VÉRIFICATION BDD (SQLITE) ---
+  // --- ÉTAPE 1 : VÉRIFICATION FIREBASE AUTH & FIRESTORE ---
   void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // 🔐 Interrogation de la VRAIE base de données SQLite chiffrée
-      final user = await LocalAuthDatabase.instance.authenticateUser(
+      // 🔐 Interrogation de Firebase Auth et Firestore
+      final user = await FirebaseAuthService.instance.authenticateUser(
           _usernameController.text.trim(),
           _passwordController.text
       );
@@ -58,7 +58,6 @@ class _LoginPageState extends State<LoginPage> {
           _show2FAStep = true; // Passage à l'étape 2FA
         });
       } else {
-        // Anti-BruteForce / Enumération : Message générique
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text("Accès refusé. Identifiants introuvables ou compte inactif."),
@@ -72,27 +71,22 @@ class _LoginPageState extends State<LoginPage> {
 
   // --- ÉTAPE 2 : VALIDATION 2FA ET ACCÈS (Zero Trust) ---
   void _grantAccess() {
-    // Dans SQLite, les booléens sont stockés sous forme d'entiers (1 ou 0)
     bool isFirstLogin = _authenticatedUser!['is_first_login'] == 1;
 
-    // Traduction de la chaîne de caractères SQLite vers l'Enum Flutter
     UserRole role = _authenticatedUser!['role'] == 'superAdmin'
         ? UserRole.superAdmin
         : UserRole.simpleAdmin;
 
-    // DEVSECOPS : Onboarding Enforcement (Blocage si profil incomplet)
     if (isFirstLogin) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profil incomplet. Configuration requise."), backgroundColor: Colors.orangeAccent, behavior: SnackBarBehavior.floating)
       );
 
-      // Ouvre l'écran obligatoire de configuration de profil
       Navigator.pushReplacement(context, CupertinoPageRoute(builder: (_) => ProfileCompletionScreen(
         userEmail: _authenticatedUser!['email'],
         role: role,
       )));
     } else {
-      // Connexion standard autorisée
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -107,7 +101,6 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
 
-      // Redirection vers le Dashboard principal
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -123,7 +116,6 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: const Color(0xFF070B14),
       body: Stack(
         children: [
-          // GLOW BACKGROUND
           Positioned(top: -100, left: -100, child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF1E3A8A).withValues(alpha: 0.3)))),
           Positioned(bottom: -100, right: -100, child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF00E5FF).withValues(alpha: 0.2)))),
           BackdropFilter(filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50), child: Container(color: Colors.transparent)),
@@ -163,9 +155,8 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 🚀 TON LOGO EST ICI
             Image.asset(
-              'assets/Logo_principal.png',
+              'assets/logo.png',
               height: 70,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
@@ -241,7 +232,6 @@ class _LoginPageState extends State<LoginPage> {
       decoration: BoxDecoration(color: const Color(0xFF070B14), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))),
     );
 
-    // Extraction sécurisée du rôle depuis la base de données
     bool isSuperAdmin = _authenticatedUser!['role'] == 'superAdmin';
     Color roleColor = isSuperAdmin ? const Color(0xFFFF2A55) : const Color(0xFF00E5FF);
 
@@ -258,9 +248,8 @@ class _LoginPageState extends State<LoginPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 🚀 TON LOGO EST ICI AUSSI
           Image.asset(
-            'assets/Logo_principal.png',
+            'assets/logo.png',
             height: 70,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
@@ -268,8 +257,6 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 24),
           const Text("Double Facteur Requis", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-
-          // Texte dynamique selon le rôle
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: roleColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
@@ -282,13 +269,11 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           const SizedBox(height: 32),
-
           Pinput(
             length: 6,
             defaultPinTheme: defaultPinTheme,
             focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
             onCompleted: (pin) {
-              // En production, vérifier si le PIN saisi correspond au token généré par le SuperAdmin
               if (pin == "123456") {
                 _grantAccess();
               } else {

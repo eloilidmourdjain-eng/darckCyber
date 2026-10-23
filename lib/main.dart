@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:darck_puls/features/auth/welcome_page.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:darck_puls/core/routes.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const DockPulseApp());
 }
 

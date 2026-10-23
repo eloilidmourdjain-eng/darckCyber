@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ⚠️ Assure-toi que ces imports pointent bien vers les bons fichiers dans ton projet !
 import 'package:darck_puls/features/superAdmin/screens/iam_management_screen.dart'; // Pour la classe SystemUser
-import 'package:darck_puls/core/local_auth_db.dart'; // Ta base de données SQLite
+import 'package:darck_puls/core/firebase_auth_service.dart'; // 👈 Remplacement par le service Firebase
 
 class UserProvisioningModal extends StatefulWidget {
   final Function(SystemUser) onUserCreated;
@@ -43,12 +42,12 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
     String newId = "USR-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
 
     try {
-      // 2. 🗄️ SAUVEGARDE RÉELLE DANS LA BASE DE DONNÉES SQLITE
-      await LocalAuthDatabase.instance.provisionAdmin(
+      // 2. 🚀 SAUVEGARDE DANS FIREBASE AUTH & FIRESTORE
+      await FirebaseAuthService.instance.provisionAdmin(
         newId,
         _nameController.text.trim(),
         _emailController.text.trim(),
-        _passwordController.text, // Le mot de passe sera haché (SHA-256) en interne par LocalAuthDatabase !
+        _passwordController.text,
       );
 
       // 3. Mise à jour de l'interface graphique (L'écran derrière le modal)
@@ -147,7 +146,7 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
                     ),
                     CupertinoSwitch(
                         value: _forceMfa,
-                        activeTrackColor: Colors.greenAccent,
+                        activeColor: Colors.greenAccent,
                         onChanged: (val) => setState(() => _forceMfa = val)
                     ),
                   ],
@@ -168,7 +167,7 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Icon(CupertinoIcons.check_mark_circled_solid, size: 18),
                   label: Text(
-                      _isProvisioning ? "ÉCRITURE DANS LA BDD..." : "CRÉER LE COMPTE ADMIN",
+                      _isProvisioning ? "ENREGISTREMENT FIREBASE..." : "CRÉER LE COMPTE ADMIN",
                       style: const TextStyle(fontWeight: FontWeight.bold)
                   ),
                   onPressed: _isProvisioning ? null : _submit,
