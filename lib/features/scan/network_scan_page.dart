@@ -86,26 +86,38 @@ class NetworkDiscoveryService {
 
   Future<NetworkDevice?> _pingAndDiscover(String ip) async {
     try {
-      final ping = Ping(ip, count: 1, timeout: 1);
-      final response = await ping.stream.first;
+      final ping = Ping(ip, count: 1, timeout: 1); // Timeout agressif (1 sec)
 
-      if (response.response != null && response.response!.time != null) {
-        int pingTime = response.response!.time!.inMilliseconds;
-        int ttl = response.response!.ttl ?? 64;
-        String osGuess = _guessOsByTtl(ttl);
-        NetworkDevice device = NetworkDevice(ip: ip, pingMs: pingTime, ttl: ttl, osType: osGuess);
-        device.openPorts = await _quickPortScan(ip);
-        if (device.osType == 'Unknown' && device.openPorts.contains(80)) device.osType = 'Web Server / IoT';
-        if (ip.endsWith('.1') || ip.endsWith('.254')) device.osType = 'Passerelle / Routeur';
+      // NOUVELLE SYNTAXE SÉCURISÉE (dart_ping v8+)
+      // On écoute le stream et on filtre uniquement les vraies réponses (PingResponse)
+      await for (final event in ping.stream) {
+        if (event is PingResponse && event.time != null) {
 
-        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-          device.vendor = await _getMacFromArp(ip);
-        } else {
-          device.vendor = "MAC masquée (OS Mobile)";
+          int pingTime = event.time!.inMilliseconds;
+          int ttl = event.ttl ?? 64;
+
+          // OS Fingerprinting basé sur le TTL réseau
+          String osGuess = _guessOsByTtl(ttl);
+
+          NetworkDevice device = NetworkDevice(ip: ip, pingMs: pingTime, ttl: ttl, osType: osGuess);
+
+          // Scan TCP rapide et silencieux
+          device.openPorts = await _quickPortScan(ip);
+
+          if (device.osType == 'Unknown' && device.openPorts.contains(80)) device.osType = 'Web Server / IoT';
+          if (ip.endsWith('.1') || ip.endsWith('.254')) device.osType = 'Passerelle / Routeur';
+
+          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+            device.vendor = await _getMacFromArp(ip);
+          } else {
+            device.vendor = "MAC masquée (OS Mobile)";
+          }
+          return device; // On a trouvé la machine, on quitte la boucle
         }
-        return device;
       }
-    } catch (e) {}
+    } catch (e) {
+      // Host down ou injoignable (Ignoré silencieusement pour le scan)
+    }
     return null;
   }
 

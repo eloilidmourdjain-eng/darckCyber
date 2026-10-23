@@ -2,7 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:darck_puls/features/superAdmin/screens/iam_management_screen.dart';
+
+// ⚠️ Assure-toi que ces imports pointent bien vers les bons fichiers dans ton projet !
+import 'package:darck_puls/features/superAdmin/screens/iam_management_screen.dart'; // Pour la classe SystemUser
+import 'package:darck_puls/core/local_auth_db.dart'; // Ta base de données SQLite
 
 class UserProvisioningModal extends StatefulWidget {
   final Function(SystemUser) onUserCreated;
@@ -19,21 +22,60 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _forceMfa = true;
+  bool _isObscure = true;
+  bool _isProvisioning = false; // État de chargement
 
-  void _submit() {
-    if (_nameController.text.isEmpty || _emailController.text.isEmpty) return;
+  void _submit() async {
+    // 1. Validation basique
+    if (_nameController.text.isEmpty || _emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Erreur : Tous les champs sont obligatoires."),
+            backgroundColor: Colors.redAccent,
+          )
+      );
+      return;
+    }
 
-    final newUser = SystemUser(
-      "USR-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}",
-      _nameController.text,
-      _emailController.text,
-      "Admin Réseau", // On force "Simple Admin" par sécurité (un seul Root)
-      true,
-      "Compte fraîchement provisionné",
-    );
+    setState(() => _isProvisioning = true);
 
-    widget.onUserCreated(newUser);
-    Navigator.pop(context); // Ferme le modal
+    // Génération d'un ID unique
+    String newId = "USR-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
+
+    try {
+      // 2. 🗄️ SAUVEGARDE RÉELLE DANS LA BASE DE DONNÉES SQLITE
+      await LocalAuthDatabase.instance.provisionAdmin(
+        newId,
+        _nameController.text.trim(),
+        _emailController.text.trim(),
+        _passwordController.text, // Le mot de passe sera haché (SHA-256) en interne par LocalAuthDatabase !
+      );
+
+      // 3. Mise à jour de l'interface graphique (L'écran derrière le modal)
+      final newUser = SystemUser(
+        newId,
+        _nameController.text.trim(),
+        _emailController.text.trim(),
+        "Admin Réseau", // On force "Simple Admin" : seul le créateur originel est Root.
+        true,
+        "Compte fraîchement provisionné",
+      );
+
+      widget.onUserCreated(newUser);
+
+      if (!mounted) return;
+      Navigator.pop(context); // Ferme le modal avec succès
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isProvisioning = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Échec du provisionnement (L'email existe peut-être déjà). Erreur: $e"),
+            backgroundColor: Colors.redAccent,
+          )
+      );
+    }
   }
 
   @override
@@ -60,15 +102,20 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // --- HEADER DU MODAL ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text("PROVISIONNEMENT ADMIN", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(CupertinoIcons.clear_circled_solid, color: Colors.blueGrey), onPressed: () => Navigator.pop(context)),
+                  IconButton(
+                      icon: const Icon(CupertinoIcons.clear_circled_solid, color: Colors.blueGrey),
+                      onPressed: () => Navigator.pop(context)
+                  ),
                 ],
               ),
               const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(color: Colors.white12, height: 1)),
 
+              // --- FORMULAIRE ---
               const Text("Identité", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
               const SizedBox(height: 8),
               _buildInputField("Nom Complet (ex: Alice Smith)", CupertinoIcons.person, _nameController),
@@ -81,32 +128,54 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
 
               const Text("Sécurité", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
               const SizedBox(height: 8),
-              _buildInputField("Mot de passe temporaire", CupertinoIcons.lock, _passwordController, isObscure: true),
+              _buildInputField("Mot de passe temporaire", CupertinoIcons.lock, _passwordController, isPassword: true),
               const SizedBox(height: 16),
 
+              // --- MFA TOGGLE ---
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3))),
+                decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3))
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(child: Text("Forcer l'enregistrement MFA/2FA à la première connexion", style: TextStyle(color: Colors.greenAccent, fontSize: 11))),
-                    CupertinoSwitch(value: _forceMfa, activeColor: Colors.greenAccent, onChanged: (val) => setState(() => _forceMfa = val)),
+                    const Expanded(
+                        child: Text("Forcer l'enregistrement MFA/2FA et Profile à la première connexion", style: TextStyle(color: Colors.greenAccent, fontSize: 11))
+                    ),
+                    CupertinoSwitch(
+                        value: _forceMfa,
+                        activeTrackColor: Colors.greenAccent,
+                        onChanged: (val) => setState(() => _forceMfa = val)
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
 
+              // --- BOUTON DE SOUMISSION ---
               SizedBox(
                 width: double.infinity, height: 50,
                 child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF2A55), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  icon: const Icon(CupertinoIcons.check_mark_circled_solid, size: 18),
-                  label: const Text("CRÉER LE COMPTE ADMIN", style: TextStyle(fontWeight: FontWeight.bold)),
-                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF2A55),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  ),
+                  icon: _isProvisioning
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(CupertinoIcons.check_mark_circled_solid, size: 18),
+                  label: Text(
+                      _isProvisioning ? "ÉCRITURE DANS LA BDD..." : "CRÉER LE COMPTE ADMIN",
+                      style: const TextStyle(fontWeight: FontWeight.bold)
+                  ),
+                  onPressed: _isProvisioning ? null : _submit,
                 ),
               ),
-              // Padding pour le clavier virtuel sur mobile
+
+              // Padding dynamique pour éviter que le clavier mobile ne cache le bouton
               SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
             ],
           ),
@@ -115,19 +184,31 @@ class _UserProvisioningModalState extends State<UserProvisioningModal> {
     );
   }
 
-  Widget _buildInputField(String hint, IconData icon, TextEditingController controller, {bool isObscure = false}) {
+  // --- WIDGET UTILITAIRE (Input Field) ---
+  Widget _buildInputField(String hint, IconData icon, TextEditingController controller, {bool isPassword = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(color: const Color(0xFF070B14), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+      decoration: BoxDecoration(
+          color: const Color(0xFF070B14),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1))
+      ),
       child: TextField(
         controller: controller,
-        obscureText: isObscure,
+        obscureText: isPassword && _isObscure,
         style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 13),
         decoration: InputDecoration(
           icon: Icon(icon, color: const Color(0xFF00E5FF), size: 18),
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white30),
           border: InputBorder.none,
+          // Bouton pour afficher/masquer le mot de passe
+          suffixIcon: isPassword
+              ? IconButton(
+              icon: Icon(_isObscure ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill, color: const Color(0xFF00E5FF), size: 18),
+              onPressed: () => setState(() => _isObscure = !_isObscure)
+          )
+              : null,
         ),
       ),
     );

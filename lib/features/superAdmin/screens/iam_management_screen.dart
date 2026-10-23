@@ -116,14 +116,76 @@ class _IamManagementScreenState extends State<IamManagementScreen> with SingleTi
   }
 
   // ==========================================
-  // ONGLET 1 : GESTION DES UTILISATEURS
+  // ONGLET 1 : GESTION DES UTILISATEURS & 2FA (Version Unifiée)
   // ==========================================
   Widget _buildUsersTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // --- 🚀 GÉNÉRATEUR DE TOKENS (OOB MFA) ---
+        Container(
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kCyan.withValues(alpha: 0.4)),
+            boxShadow: [BoxShadow(color: kCyan.withValues(alpha: 0.1), blurRadius: 20)],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: kCyan.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(CupertinoIcons.lock_shield_fill, color: kCyan, size: 32),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("GÉNÉRATEUR DE TOKENS (OOB MFA)", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 4),
+                    Text("Générez un code temporaire pour débloquer la session d'un administrateur à distance.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 11)),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: kCyan, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+                icon: const Icon(CupertinoIcons.arrow_2_circlepath, size: 18),
+                label: const Text("Générer (60s)", style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: kCardColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kCyan)),
+                      title: const Text("Token d'Authentification Généré", style: TextStyle(color: Colors.white, fontSize: 16)),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text("Communiquez ce code à l'administrateur. Il expirera dans 60 secondes.", textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(12), border: Border.all(color: kCyan)),
+                            child: Text("123456", style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 8.0)),
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Fermer", style: TextStyle(color: Colors.blueGrey))),
+                      ],
+                    ),
+                  );
+                },
+              )
+            ],
+          ),
+        ),
+
         Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -144,6 +206,8 @@ class _IamManagementScreenState extends State<IamManagementScreen> with SingleTi
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -155,7 +219,11 @@ class _IamManagementScreenState extends State<IamManagementScreen> with SingleTi
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: user.isActive ? Colors.white.withValues(alpha: 0.05) : Colors.redAccent.withValues(alpha: 0.3))),
+                decoration: BoxDecoration(
+                    color: kCardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: user.isActive ? Colors.white.withValues(alpha: 0.05) : Colors.redAccent.withValues(alpha: 0.3))
+                ),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -210,61 +278,43 @@ class _IamManagementScreenState extends State<IamManagementScreen> with SingleTi
   // ONGLET 2 : AUDIT DES FAITS ET GESTES (WORM)
   // ==========================================
   Widget _buildAuditTab() {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
+    return ListView.builder(
+      padding: const EdgeInsets.all(24),
+      itemCount: _auditLogs.length,
+      itemBuilder: (context, index) {
+        final log = _auditLogs[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
-          color: kRootColor.withValues(alpha: 0.1),
-          child: Text("⚠️ REGISTRE D'AUDIT SCELLÉ. Les actions des administrateurs sont journalisées cryptographiquement et ne peuvent être ni altérées ni supprimées.", style: TextStyle(color: kRootColor, fontSize: 11, fontWeight: FontWeight.bold)),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(24),
-            itemCount: _auditLogs.length,
-            itemBuilder: (context, index) {
-              final log = _auditLogs[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(6)),
+                child: Text(log.timestamp, style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 10)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(log.user, style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text(log.timestamp, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[500], fontSize: 10)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(CupertinoIcons.arrow_right_square_fill, color: Colors.blueGrey, size: 14),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(log.action, style: const TextStyle(color: Colors.white, fontSize: 13))),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(6)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text("Cible: ${log.target}", style: TextStyle(color: Colors.blueGrey[300], fontSize: 11)),
-                          Text(log.ipContext, style: TextStyle(color: Colors.blueGrey[500], fontSize: 10)),
-                        ],
-                      ),
-                    )
+                    Text(log.action, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 2),
+                    Text("Cible : ${log.target}", style: TextStyle(color: Colors.blueGrey[400], fontSize: 11)),
+                    const SizedBox(height: 2),
+                    Text("Par : ${log.user} (${log.ipContext})", style: TextStyle(color: Colors.blueGrey[600], fontSize: 10)),
                   ],
                 ),
-              );
-            },
+              ),
+            ],
           ),
-        )
-      ],
+        );
+      },
     );
   }
 }

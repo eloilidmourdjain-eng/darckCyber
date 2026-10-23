@@ -207,7 +207,7 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                 ),
                                 const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider(color: Colors.white12, height: 1, thickness: 1)),
 
-                                // --- LOGO CENTRAL (L'ANCIEN CODE RÉINTÉGRÉ ICI) ---
+                                // --- LOGO CENTRAL (INTÉGRÉ À LA PLACE DE L'ICÔNE) ---
                                 Center(
                                   child: Container(
                                     padding: const EdgeInsets.all(20),
@@ -219,7 +219,7 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                     ),
                                     child: Image.asset(
                                       'assets/Logo_principal.png',
-                                      height: 80, // Taille ajustée pour ne pas prendre toute la place
+                                      height: 80, // Taille ajustée pour l'encadré
                                       fit: BoxFit.contain,
                                       errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.waveform_path_ecg, size: 60, color: kAccentCyan),
                                     ),
@@ -238,7 +238,7 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                   id: 1,
                                   title: "MODE LOCAL (EDGE COMPUTE)",
                                   desc: "Analyse autonome (SOHO/PAN). L'application utilise la puce réseau du terminal pour scanner le Wi-Fi.",
-                                  icon: Icons.router, //
+                                  icon: Icons.router,
                                   color: kAccentCyan,
                                 ),
                                 const SizedBox(height: 16),

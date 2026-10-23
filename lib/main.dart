@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:darck_puls/features/auth/welcome_page.dart';
-import 'package:darck_puls/core/routes.dart'; // Import de ton fichier de routes
+import 'package:darck_puls/core/routes.dart';
 
 void main() {
   runApp(const DockPulseApp());

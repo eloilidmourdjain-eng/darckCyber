@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
+import 'package:shelf_web_socket/src/web_socket_handler.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() async {
@@ -13,14 +14,14 @@ void main() async {
   // ========================================================
   var wsHandler = webSocketHandler((WebSocketChannel webSocket) {
     dashboardClients.add(webSocket);
-    debugPrint("🔌 [C2-NODE] Application Dashboard Dark Pulse connectée.");
+    debugPrint("🔌 [C2-NODE] Application Dashboard Dark Puls connectée.");
 
     webSocket.stream.listen(
           (message) {},
       onDone: () => dashboardClients.remove(webSocket),
       onError: (err) => dashboardClients.remove(webSocket),
     );
-  });
+  } as ConnectionCallback);
 
   final wsServer = await io.serve(wsHandler, '0.0.0.0', 8080);
   debugPrint('🚀 [SIEM] WebSocket actif sur le port ${wsServer.port}');

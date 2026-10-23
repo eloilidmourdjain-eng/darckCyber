@@ -16,11 +16,8 @@ import 'package:darck_puls/features/topology/ai_topology_screen.dart';
 import 'package:darck_puls/features/traffic_management/traffic_management_screen.dart';
 import 'package:darck_puls/features/provisioning/architecture_provisioning_screen.dart';
 import 'package:darck_puls/features/maintenance/maintenance_screen.dart';
-
-// 🚀 NOUVELLES FENÊTRES INTÉGRÉES
 import 'package:darck_puls/features/logs/log_center_screen.dart';
 import 'package:darck_puls/features/settings/system_settings_screen.dart';
-
 import 'package:darck_puls/features/superAdmin/super_admin_page.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -55,8 +52,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const TrafficManagementScreen(),
       const ArchitectureAndProvisioningScreen(),
       const MaintenanceScreen(),
-      const LogCenterScreen(),      // 🆕 Ajout du Centre des Logs
-      const SystemSettingsScreen(), // 🆕 Ajout des Paramètres
+      const LogCenterScreen(),
+      const SystemSettingsScreen(),
     ];
 
     _navItems = [
@@ -68,19 +65,71 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       NavigationItem(icon: CupertinoIcons.slider_horizontal_3, label: "Trafic"),
       NavigationItem(icon: CupertinoIcons.square_stack_3d_up, label: "Infra (IaC)"),
       NavigationItem(icon: CupertinoIcons.wrench_fill, label: "NetOps"),
-      NavigationItem(icon: CupertinoIcons.list_bullet_indent, label: "Logs SIEM"), // 🆕
-      NavigationItem(icon: CupertinoIcons.settings, label: "Réglages"),            // 🆕
+      NavigationItem(icon: CupertinoIcons.list_bullet_indent, label: "Logs SIEM"),
+      NavigationItem(icon: CupertinoIcons.settings, label: "Réglages"),
     ];
 
     // 2. PRIVILÈGE SUPER ADMIN : Ajout de la Console Restreinte
     if (widget.role == UserRole.superAdmin) {
-      _screens.add(const SuperAdminToolsPage());
+      _screens.add(const SuperAdminToolsPage()); // La War Room
       _navItems.add(NavigationItem(
           icon: CupertinoIcons.flame_fill,
           label: "Root Console",
           color: const Color(0xFFFF2A55)
       ));
     }
+  }
+
+  // --- PROTOCOLE DE DÉCONNEXION SÉCURISÉE (DevSecOps) ---
+  void _executeSecureLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Empêche de cliquer à côté
+      builder: (BuildContext dialogContext) {
+        // Lancement de la séquence de destruction en arrière-plan
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!context.mounted) return;
+          // Purge de l'historique de navigation et retour au login
+          Navigator.pushAndRemoveUntil(
+            context,
+            CupertinoPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+          );
+        });
+
+        // Interface UI du nettoyage de session (Glassmorphism)
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF070B14).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5), width: 2),
+                boxShadow: [BoxShadow(color: Colors.redAccent.withValues(alpha: 0.2), blurRadius: 40)],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(CupertinoIcons.lock_shield_fill, color: Colors.redAccent, size: 60),
+                  const SizedBox(height: 24),
+                  const Text("FERMETURE DE SESSION", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
+                  const SizedBox(height: 16),
+                  const CircularProgressIndicator(color: Colors.redAccent),
+                  const SizedBox(height: 16),
+                  Text("Purge des jetons cryptographiques en RAM...", style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[400], fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text("Déconnexion des WebSockets...", style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[400], fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -93,7 +142,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           backgroundColor: const Color(0xFF070B14),
           body: Row(
             children: [
-              if (isDesktop) _buildDesktopSidebar(),
+              if (isDesktop) _buildDesktopSidebar(context),
               Expanded(
                 child: Stack(
                   children: [
@@ -118,7 +167,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Widget _buildDesktopSidebar() {
+  Widget _buildDesktopSidebar(BuildContext context) {
     return Container(
       width: 100,
       decoration: BoxDecoration(
@@ -139,7 +188,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))
             ),
             child: Image.asset(
-              'assets/Logo_principal.png',
+              'assets/logo.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(
                   CupertinoIcons.waveform_path_ecg,
@@ -200,15 +249,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 24.0),
             child: IconButton(
-              icon: const Icon(CupertinoIcons.power, color: Colors.redAccent),
-              tooltip: "Verrouiller la session",
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
-                        (route) => false
-                );
-              },
+              icon: const Icon(CupertinoIcons.power, color: Colors.redAccent, size: 28),
+              tooltip: "Déconnexion Sécurisée",
+              onPressed: () => _executeSecureLogout(context), // 🚀 Appel de la déconnexion sécurisée
             ),
           ),
         ],
@@ -370,11 +413,11 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                 return Stack(
                   children: [
                     Positioned(
-                      top: size.height * 0.2 + y1, left: size.width * 0.2 + x1,
+                      top: (size.height * 0.2) + y1, left: (size.width * 0.2) + x1,
                       child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF00E5FF).withValues(alpha: 0.08))),
                     ),
                     Positioned(
-                      bottom: size.height * 0.1 + y2, right: size.width * 0.1 + x2,
+                      bottom: (size.height * 0.1) + y2, right: (size.width * 0.1) + x2,
                       child: Container(width: 400, height: 400, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF8B5CF6).withValues(alpha: 0.08))),
                     ),
                   ],
@@ -392,10 +435,10 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                   return Transform.translate(
                     offset: Offset(0, dy),
                     child: Opacity(
-                      opacity: 0.05,
+                      opacity: 0.04,
                       child: Center(
                         child: Image.asset(
-                          'assets/Logo_principal.png',
+                          'assets/logo.png',
                           width: 500,
                           height: 500,
                           fit: BoxFit.contain,
@@ -449,6 +492,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                       ),
                       const SizedBox(height: 48),
 
+                      // Grid des statistiques rapides (NOC)
                       const Text("VUE D'ENSEMBLE (LIVE NOC)", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       const SizedBox(height: 16),
                       LayoutBuilder(
@@ -472,11 +516,12 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
 
                       const SizedBox(height: 48),
 
+                      // Activités récentes
                       const Text("ACTIVITÉ RÉCENTE", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       const SizedBox(height: 16),
                       _buildActivityRow("Télémétrie IA : Aucune dérive critique détectée.", "En direct", CupertinoIcons.waveform_path_ecg),
                       _buildActivityRow("Synchronisation GitOps (Vault) réussie.", "Il y a 5 min", CupertinoIcons.cloud_upload),
-                      _buildActivityRow("Analyse Wi-Fi de routine terminée.", "Il y a 12 min", CupertinoIcons.wifi),
+                      _buildActivityRow("Nouvel accès Administrateur.", "Il y a 45 min", CupertinoIcons.person_alt),
                     ],
                   ),
                 ),
