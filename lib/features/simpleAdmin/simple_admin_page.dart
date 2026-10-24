@@ -52,7 +52,7 @@ class _DashboardPageState extends State<SimpleAdminPage> {
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
-                "DARCK_CYBER v2.5 - ENTERPRISE",
+                "DARCK_PULS v2.5 - ENTERPRISE",
                 style: TextStyle(color: kAccentColor, fontWeight: FontWeight.bold, fontSize: 14),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -674,7 +674,7 @@ class _DashboardPageState extends State<SimpleAdminPage> {
                 const CircleAvatar(backgroundColor: kAccentColor, child: Text("EM", style: TextStyle(color: kBackgroundColor, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 10),
                 const Text("Éloilid Mourdjain", style: TextStyle(color: kTextMain, fontWeight: FontWeight.bold)),
-                Text("Admin - DarckCyber", style: TextStyle(color: kTextSecondary, fontSize: 12)),
+                Text("Admin - Darck Puls", style: TextStyle(color: kTextSecondary, fontSize: 12)),
               ],
             ),
           ),

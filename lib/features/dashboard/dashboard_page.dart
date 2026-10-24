@@ -476,7 +476,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("DARK PULSE CORE", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                              const Text("DARCK PULS CORE", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                               Text("Tous les systèmes sont opérationnels.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
                             ],
                           ),

@@ -244,7 +244,7 @@ class _DefenseDashboardWidgetState extends State<DefenseDashboardWidget> with Ti
       appBar: AppBar(
         backgroundColor: kBgColor,
         elevation: 0,
-        title: const Text('Dark Pulse • SOC & Security Center', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        title: const Text('Darck Puls • SOC & Security Center', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         actions: [_buildStatusBadge()],
         bottom: TabBar(
           controller: _tabController,

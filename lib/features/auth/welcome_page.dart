@@ -73,7 +73,7 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Saisissez les coordonnées de votre contrôleur Dark Pulse distant (SDN).", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const Text("Saisissez les coordonnées de votre contrôleur Darck Puls distant (SDN).", style: TextStyle(color: Colors.white70, fontSize: 12)),
                   const SizedBox(height: 20),
                   _buildSecureInputField("URL du Contrôleur (https://...)", CupertinoIcons.link),
                   const SizedBox(height: 12),

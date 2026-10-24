@@ -28,7 +28,7 @@ class _ArchitectureAndProvisioningScreenState extends State<ArchitectureAndProvi
 
   // TERMINAL INTERACTIF (Remplacement de la String statique par un Controller éditable)
   final TextEditingController _scriptEditorController = TextEditingController(
-      text: "// Dark Pulse Engine : En attente de configuration sécurisée...\n// Remplissez les paramètres et validez le générateur."
+      text: "// Darck Puls Engine : En attente de configuration sécurisée...\n// Remplissez les paramètres et validez le générateur."
   );
 
   String _selectedArchitecture = "Réseau Hybride (LAN/WLAN)";
@@ -76,7 +76,7 @@ ip name-server ${_secondaryDNS.text}
 
         _scriptEditorController.text = '''
 ! ----------------------------------------------------
-! DARK PULSE ZTP AUTOMATION ENGINE (SECURE v2.6)
+! DARCK PULS ZTP AUTOMATION ENGINE (SECURE v2.6)
 ! Target: ${_hostnameController.text}
 ! Compliance: CIS Benchmark / NIST SP 800-53
 ! ----------------------------------------------------
@@ -177,7 +177,7 @@ write memory
             children: [
               const Padding(
                 padding: EdgeInsets.all(24.0),
-                child: Text('Dark Pulse Infrastructure', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                child: Text('Darck Puls Infrastructure', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
               TabBar(
                 indicatorColor: const Color(0xFF00E5FF),

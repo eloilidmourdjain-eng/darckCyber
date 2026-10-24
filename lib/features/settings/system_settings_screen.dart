@@ -86,7 +86,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF2A55).withValues(alpha: 0.1), foregroundColor: const Color(0xFFFF2A55), side: const BorderSide(color: Color(0xFFFF2A55)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             icon: const Icon(CupertinoIcons.restart, size: 18),
-            label: const Text("REDÉMARRER LE CONTRÔLEUR DARK PULSE", style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text("REDÉMARRER LE CONTRÔLEUR DARCK PULS", style: TextStyle(fontWeight: FontWeight.bold)),
             onPressed: () {},
           ),
         ),
