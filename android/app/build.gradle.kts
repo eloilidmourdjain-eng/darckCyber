@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.darckcyber"
+    namespace = "com.darckplus.darckcyber"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.darckcyber"
+        applicationId = "com.darckplus.darckcyber"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
