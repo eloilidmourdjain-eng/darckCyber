@@ -5,10 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pinput/pinput.dart';
 
 // --- IMPORTS METIERS ---
-import 'package:darck_puls/features/dashboard/dashboard_page.dart'; // Le MainNavigationScreen
+import 'package:darck_puls/features/dashboard/dashboard_page.dart';
 import 'package:darck_puls/core/models/user_role.dart';
-import 'package:darck_puls/core/firebase_auth_service.dart'; // 👈 Remplacement par le service Firebase
-import 'package:darck_puls/features/auth/profile_completion_screen.dart'; // 👈 L'écran de configuration du profil
+import 'package:darck_puls/core/firebase_auth_service.dart';
+import 'package:darck_puls/features/auth/profile_completion_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -43,7 +43,6 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      // 🔐 Interrogation de Firebase Auth et Firestore
       final user = await FirebaseAuthService.instance.authenticateUser(
           _usernameController.text.trim(),
           _passwordController.text
@@ -55,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
       if (user != null) {
         setState(() {
           _authenticatedUser = user;
-          _show2FAStep = true; // Passage à l'étape 2FA
+          _show2FAStep = true;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -140,64 +139,67 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildLoginScreen() {
-    return Container(
+    return Material(
       key: const ValueKey(1),
-      constraints: const BoxConstraints(maxWidth: 450),
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131C2D).withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 40)],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/logo.png',
-              height: 70,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
-            ),
-            const SizedBox(height: 24),
-            const Text("Z T N A", style: TextStyle(color: Color(0xFF00E5FF), fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 8.0)),
-            const Text("Zero Trust Network Access", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 32),
-
-            _buildTextField(
-              controller: _usernameController,
-              hint: "Email / Identifiant IAM",
-              icon: CupertinoIcons.person_alt,
-              validator: (value) => (value == null || value.trim().isEmpty) ? "Requis" : null,
-            ),
-            const SizedBox(height: 16),
-
-            _buildTextField(
-              controller: _passwordController,
-              hint: "Mot de passe",
-              icon: CupertinoIcons.lock_fill,
-              isPassword: true,
-              validator: (value) => (value == null || value.isEmpty) ? "Requis" : null,
-            ),
-            const SizedBox(height: 32),
-
-            SizedBox(
-              width: double.infinity, height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E3A8A),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
-                  elevation: 4,
-                ),
-                onPressed: _isLoading ? null : _handleLogin,
-                child: _isLoading
-                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text("AUTHENTIFICATION", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0, color: Colors.white)),
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 450),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131C2D).withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 40)],
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/logo.png',
+                height: 70,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              const Text("Z T N A", style: TextStyle(color: Color(0xFF00E5FF), fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 8.0)),
+              const Text("Zero Trust Network Access", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 32),
+
+              _buildTextField(
+                controller: _usernameController,
+                hint: "Email / Identifiant IAM",
+                icon: CupertinoIcons.person_alt,
+                validator: (value) => (value == null || value.trim().isEmpty) ? "Requis" : null,
+              ),
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                controller: _passwordController,
+                hint: "Mot de passe",
+                icon: CupertinoIcons.lock_fill,
+                isPassword: true,
+                validator: (value) => (value == null || value.isEmpty) ? "Requis" : null,
+              ),
+              const SizedBox(height: 32),
+
+              SizedBox(
+                width: double.infinity, height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E3A8A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFF00E5FF), width: 1.5)),
+                    elevation: 4,
+                  ),
+                  onPressed: _isLoading ? null : _handleLogin,
+                  child: _isLoading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text("AUTHENTIFICATION", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -235,59 +237,65 @@ class _LoginPageState extends State<LoginPage> {
     bool isSuperAdmin = _authenticatedUser!['role'] == 'superAdmin';
     Color roleColor = isSuperAdmin ? const Color(0xFFFF2A55) : const Color(0xFF00E5FF);
 
-    return Container(
+    return Material(
       key: const ValueKey(2),
-      constraints: const BoxConstraints(maxWidth: 450),
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: const Color(0xFF131C2D).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: roleColor.withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [BoxShadow(color: roleColor.withValues(alpha: 0.1), blurRadius: 40)],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/logo.png',
-            height: 70,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
-          ),
-          const SizedBox(height: 24),
-          const Text("Double Facteur Requis", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: roleColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-            child: Text(
-                isSuperAdmin
-                    ? "Saisissez votre code Authenticator personnel (Root Access)."
-                    : "Compte Admin Standard détecté.\nVeuillez demander un Token d'accès éphémère (OOB) à votre Super Administrateur.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: roleColor, fontSize: 12, fontWeight: FontWeight.bold)
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 450),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131C2D).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: roleColor.withValues(alpha: 0.4), width: 1.5),
+          boxShadow: [BoxShadow(color: roleColor.withValues(alpha: 0.1), blurRadius: 40)],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 70,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
             ),
-          ),
-          const SizedBox(height: 32),
-          Pinput(
-            length: 6,
-            defaultPinTheme: defaultPinTheme,
-            focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
-            onCompleted: (pin) {
-              if (pin == "123456") {
-                _grantAccess();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Token invalide ou expiré."), backgroundColor: Colors.redAccent));
-              }
-            },
-          ),
-          const SizedBox(height: 32),
-          TextButton.icon(
-            icon: const Icon(CupertinoIcons.back, size: 14),
-            onPressed: () => setState(() { _show2FAStep = false; _authenticatedUser = null; }),
-            label: const Text("Annuler l'authentification", style: TextStyle(color: Colors.blueGrey)),
-          ),
-        ],
+            const SizedBox(height: 24),
+            const Text("Double Facteur Requis", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: roleColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+              child: Text(
+                  isSuperAdmin
+                      ? "Saisissez votre code Authenticator personnel (Root Access)."
+                      : "Compte Admin Standard détecté.\nVeuillez demander un Token d'accès éphémère (OOB) à votre Super Administrateur.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: roleColor, fontSize: 12, fontWeight: FontWeight.bold)
+              ),
+            ),
+            const SizedBox(height: 32),
+            Material(
+              color: Colors.transparent,
+              child: Pinput(
+                length: 6,
+                defaultPinTheme: defaultPinTheme,
+                focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
+                onCompleted: (pin) {
+                  if (pin == "123456") {
+                    _grantAccess();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Token invalide ou expiré."), backgroundColor: Colors.redAccent));
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+            TextButton.icon(
+              icon: const Icon(CupertinoIcons.back, size: 14),
+              onPressed: () => setState(() { _show2FAStep = false; _authenticatedUser = null; }),
+              label: const Text("Annuler l'authentification", style: TextStyle(color: Colors.blueGrey)),
+            ),
+          ],
+        ),
       ),
     );
   }

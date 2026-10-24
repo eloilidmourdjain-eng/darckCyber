@@ -11,21 +11,28 @@ class FirebaseAuthService {
   // --- AUTHENTIFICATION ---
   Future<Map<String, dynamic>?> authenticateUser(String email, String password) async {
     try {
+      print("DEBUG - Tentative de connexion Auth pour : $email");
       UserCredential credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       if (credential.user != null) {
+        print("DEBUG - Connexion Auth réussie. UID Firebase Auth : ${credential.user!.uid}");
+
+        print("📡 [Firestore] Tentative de lecture du document pour l'UID : ${credential.user!.uid}");
         DocumentSnapshot userDoc = await _firestore
             .collection('users')
             .doc(credential.user!.uid)
             .get();
 
         if (userDoc.exists) {
+          print("✅ [Firestore] Communication réussie ! Données reçues : ${userDoc.data()}");
           Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
           data['id'] = credential.user!.uid;
           return data;
+        } else {
+          print("❌ [Firestore] La base de données a répondu, mais aucun document ne correspond à cet UID.");
         }
       }
     } catch (e) {
