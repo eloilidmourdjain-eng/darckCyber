@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    //id("kotlin-android")
     // Le plugin Flutter doit être appliqué après les plugins Android et Kotlin
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
