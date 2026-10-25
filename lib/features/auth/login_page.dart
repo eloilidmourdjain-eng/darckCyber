@@ -141,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLoginScreen() {
     return Material(
       key: const ValueKey(1),
-      type: MaterialType.transparency, // 👈 CORRECTION CRITIQUE (Sécurise l'animation)
+      type: MaterialType.transparency,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 450),
         padding: const EdgeInsets.all(32),
@@ -239,7 +239,7 @@ class _LoginPageState extends State<LoginPage> {
 
     return Material(
       key: const ValueKey(2),
-      type: MaterialType.transparency, // 👈 CORRECTION CRITIQUE
+      type: MaterialType.transparency,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 450),
         padding: const EdgeInsets.all(32),
@@ -274,7 +274,6 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 32),
 
-            // 👈 Plus de Material en double ici ! Juste le Pinput direct.
             Pinput(
               length: 6,
               defaultPinTheme: defaultPinTheme,

@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:darck_puls/features/auth/welcome_page.dart';
+import "package:firebase_messaging/firebase_messaging.dart";
 import 'package:darck_puls/core/routes.dart';
 
 // Import du fichier généré par FlutterFire CLI
 import 'package:darck_puls/firebase_options.dart';
 
 void main() async {
+  @pragma('vm:entry-point')
+  Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+    // Initialisation de Firebase requise en arrière-plan
+    await Firebase.initializeApp();
+    print("Message reçu en arrière-plan : ${message.messageId}");
+  }
   // 1. Assure la liaison avec le moteur natif avant l'initialisation des services
   WidgetsFlutterBinding.ensureInitialized();
 
