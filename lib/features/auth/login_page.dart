@@ -141,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLoginScreen() {
     return Material(
       key: const ValueKey(1),
-      color: Colors.transparent,
+      type: MaterialType.transparency, // 👈 CORRECTION CRITIQUE (Sécurise l'animation)
       child: Container(
         constraints: const BoxConstraints(maxWidth: 450),
         padding: const EdgeInsets.all(32),
@@ -157,7 +157,7 @@ class _LoginPageState extends State<LoginPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
-                'assets/logo.png',
+                'assets/Logo_principal.png',
                 height: 70,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
@@ -239,7 +239,7 @@ class _LoginPageState extends State<LoginPage> {
 
     return Material(
       key: const ValueKey(2),
-      color: Colors.transparent,
+      type: MaterialType.transparency, // 👈 CORRECTION CRITIQUE
       child: Container(
         constraints: const BoxConstraints(maxWidth: 450),
         padding: const EdgeInsets.all(32),
@@ -253,7 +253,7 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/logo.png',
+              'assets/Logo_principal.png',
               height: 70,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
@@ -273,21 +273,21 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
             const SizedBox(height: 32),
-            Material(
-              color: Colors.transparent,
-              child: Pinput(
-                length: 6,
-                defaultPinTheme: defaultPinTheme,
-                focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
-                onCompleted: (pin) {
-                  if (pin == "123456") {
-                    _grantAccess();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Token invalide ou expiré."), backgroundColor: Colors.redAccent));
-                  }
-                },
-              ),
+
+            // 👈 Plus de Material en double ici ! Juste le Pinput direct.
+            Pinput(
+              length: 6,
+              defaultPinTheme: defaultPinTheme,
+              focusedPinTheme: defaultPinTheme.copyWith(decoration: defaultPinTheme.decoration!.copyWith(border: Border.all(color: Colors.white))),
+              onCompleted: (pin) {
+                if (pin == "123456") {
+                  _grantAccess();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Token invalide ou expiré."), backgroundColor: Colors.redAccent));
+                }
+              },
             ),
+
             const SizedBox(height: 32),
             TextButton.icon(
               icon: const Icon(CupertinoIcons.back, size: 14),
