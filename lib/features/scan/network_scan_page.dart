@@ -56,26 +56,35 @@ class NetworkDiscoveryService {
 
   Future<List<NetworkDevice>> scanSubnet(String subnet, {Function(double progress)? onProgress}) async {
     List<NetworkDevice> activeDevices = [];
-    List<Future<void>> scanTasks = [];
     int completedTasks = 0;
     int totalIps = 254;
 
-    for (int i = 1; i <= totalIps; i++) {
-      final targetIp = '$subnet.$i';
-      scanTasks.add(
-        _pingAndDiscover(targetIp).then((device) {
-          completedTasks++;
-          if (onProgress != null) onProgress(completedTasks / totalIps);
-          if (device != null) activeDevices.add(device);
-        }).catchError((_) {
-          completedTasks++;
-          if (onProgress != null) onProgress(completedTasks / totalIps);
-        }),
-      );
+    // 🚀 L'ASTUCE PRO : Le Batching (Scanne par lots de 30 pour ne pas faire crasher Windows)
+    int batchSize = 30;
+
+    for (int i = 1; i <= totalIps; i += batchSize) {
+      List<Future<void>> currentBatch = [];
+
+      for (int j = i; j < i + batchSize && j <= totalIps; j++) {
+        final targetIp = '$subnet.$j';
+
+        currentBatch.add(
+          _pingAndDiscover(targetIp).then((device) {
+            completedTasks++;
+            if (onProgress != null) onProgress(completedTasks / totalIps);
+            if (device != null) activeDevices.add(device);
+          }).catchError((_) {
+            completedTasks++;
+            if (onProgress != null) onProgress(completedTasks / totalIps);
+          }),
+        );
+      }
+
+      // On attend que les 30 pings soient finis avant de lancer les 30 suivants
+      await Future.wait(currentBatch);
     }
 
-    await Future.wait(scanTasks);
-
+    // Tri IP croissant
     activeDevices.sort((a, b) {
       int ipA = int.parse(a.ip.split('.').last);
       int ipB = int.parse(b.ip.split('.').last);
