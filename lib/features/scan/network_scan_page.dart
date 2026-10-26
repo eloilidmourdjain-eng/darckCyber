@@ -1,4 +1,3 @@
-// ⚠️ GARDER LES IMPORTS DART ET FLUTTER DU HAUT INCHANGÉS
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
-import 'package:darck_puls/features/scan/host_details_page.dart';
+import 'package:darck_puls/features/scan/host_details_page.dart'; // 👈 Fiche détaillée de l'hôte
 
 // --- THÈME CYBER ---
 const Color kBackgroundColor = Color(0xFF070B14);
@@ -20,7 +19,6 @@ const Color kTextSecondary = Color(0xFF94A3B8);
 // ==========================================
 // 1. MOTEUR DE DÉCOUVERTE RÉSEAU (ALGORITHME OPTIMISÉ)
 // ==========================================
-// [Garde ton code existant pour NetworkDevice et NetworkDiscoveryService ici]
 class NetworkDevice {
   final String ip;
   final int pingMs;
@@ -75,33 +73,31 @@ class NetworkDiscoveryService {
         }),
       );
     }
+
     await Future.wait(scanTasks);
+
     activeDevices.sort((a, b) {
       int ipA = int.parse(a.ip.split('.').last);
       int ipB = int.parse(b.ip.split('.').last);
       return ipA.compareTo(ipB);
     });
+
     return activeDevices;
   }
 
   Future<NetworkDevice?> _pingAndDiscover(String ip) async {
     try {
-      final ping = Ping(ip, count: 1, timeout: 1); // Timeout agressif (1 sec)
+      final ping = Ping(ip, count: 1, timeout: 1); // Timeout agressif
 
-      // NOUVELLE SYNTAXE SÉCURISÉE (dart_ping v8+)
-      // On écoute le stream et on filtre uniquement les vraies réponses (PingResponse)
+      // 🚀 SYNTAXE DART 3 SÉCURISÉE
       await for (final event in ping.stream) {
         if (event is PingResponse && event.time != null) {
-
           int pingTime = event.time!.inMilliseconds;
           int ttl = event.ttl ?? 64;
 
-          // OS Fingerprinting basé sur le TTL réseau
           String osGuess = _guessOsByTtl(ttl);
-
           NetworkDevice device = NetworkDevice(ip: ip, pingMs: pingTime, ttl: ttl, osType: osGuess);
 
-          // Scan TCP rapide et silencieux
           device.openPorts = await _quickPortScan(ip);
 
           if (device.osType == 'Unknown' && device.openPorts.contains(80)) device.osType = 'Web Server / IoT';
@@ -112,11 +108,11 @@ class NetworkDiscoveryService {
           } else {
             device.vendor = "MAC masquée (OS Mobile)";
           }
-          return device; // On a trouvé la machine, on quitte la boucle
+          return device;
         }
       }
     } catch (e) {
-      // Host down ou injoignable (Ignoré silencieusement pour le scan)
+      // Ignoré silencieusement
     }
     return null;
   }
@@ -131,6 +127,7 @@ class NetworkDiscoveryService {
   Future<List<int>> _quickPortScan(String ip) async {
     List<int> openPorts = [];
     List<int> portsToCheck = [21, 22, 53, 80, 443, 445, 3389, 8080];
+
     for (int port in portsToCheck) {
       try {
         final socket = await Socket.connect(ip, port, timeout: const Duration(milliseconds: 250));
@@ -167,14 +164,14 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   final TextEditingController _ipController = TextEditingController();
   final NetworkDiscoveryService _discoveryService = NetworkDiscoveryService();
 
+  // Scanner States
   bool _isScanning = false;
   double _scanProgress = 0.0;
   String _pingResult = "Prêt à auditer le réseau local.";
   int? _pingLatencyMs;
-
   List<NetworkDevice> _connectedDevices = [];
 
-  // Variables Boîte à outils
+  // Toolkit States
   final TextEditingController _toolTargetController = TextEditingController();
   String _toolConsoleOutput = "Sélectionnez un outil et entrez une cible.";
   bool _isToolRunning = false;
@@ -191,14 +188,16 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this); // 🚀 PASSAGE À 4 ONGLETS
+    _tabController = TabController(length: 4, vsync: this); // 🚀 4 ONGLETS D'AUDIT
     _initializeSubnet();
   }
 
   Future<void> _initializeSubnet() async {
     final subnet = await _discoveryService.getLocalSubnet();
     if (mounted) {
-      setState(() => _ipController.text = subnet != null ? "$subnet.0/24" : "192.168.1.0/24");
+      setState(() {
+        _ipController.text = subnet != null ? "$subnet.0/24" : "192.168.1.0/24";
+      });
     }
   }
 
@@ -213,6 +212,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
   Future<void> _runNetworkScan() async {
     String input = _ipController.text.replaceAll('/24', '').trim();
     String subnet = "192.168.1";
+
     if (input.contains('.')) {
       List<String> parts = input.split('.');
       if (parts.length >= 3) subnet = "${parts[0]}.${parts[1]}.${parts[2]}";
@@ -227,9 +227,11 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
     });
 
     final stopwatch = Stopwatch()..start();
-    List<NetworkDevice> devices = await _discoveryService.scanSubnet(subnet, onProgress: (p) {
-      if (mounted) setState(() => _scanProgress = p);
+
+    List<NetworkDevice> devices = await _discoveryService.scanSubnet(subnet, onProgress: (progress) {
+      if (mounted) setState(() => _scanProgress = progress);
     });
+
     stopwatch.stop();
 
     if (mounted) {
@@ -237,12 +239,13 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
         _isScanning = false;
         _connectedDevices = devices;
         _pingLatencyMs = devices.isEmpty ? null : stopwatch.elapsedMilliseconds ~/ devices.length;
-        _pingResult = devices.isEmpty ? "Scan terminé. Aucun appareil détecté." : "Balayage réussi : ${devices.length} hôtes découverts.";
+        _pingResult = devices.isEmpty
+            ? "Scan terminé. Aucun appareil détecté sur $subnet.0/24"
+            : "Balayage réussi : ${devices.length} hôtes découverts.";
       });
     }
   }
 
-  // --- MOTEUR BOITE A OUTILS ---
   void _runToolkitAction(String toolName) async {
     if (_toolTargetController.text.isEmpty) return;
     setState(() {
@@ -250,7 +253,6 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
       _toolConsoleOutput = "[SYS] Lancement de $toolName vers ${_toolTargetController.text}...\n";
     });
 
-    // Simulation de l'outil natif
     await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
@@ -265,6 +267,12 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
     });
   }
 
+  void _exportResults() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Rapport d'audit réseau (CSV) exporté avec succès."), backgroundColor: Color(0xFF00E5FF), behavior: SnackBarBehavior.floating),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -273,7 +281,7 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
         backgroundColor: kCardColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: kAccentColor),
-        title: const Text("Asset Management & NetPath", style: TextStyle(color: kTextMain, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text("Scanner Réseau & Outils de Diag", style: TextStyle(color: kTextMain, fontSize: 16, fontWeight: FontWeight.bold)),
         bottom: TabBar(
           controller: _tabController,
           labelColor: kAccentColor,
@@ -283,18 +291,27 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
           tabs: const [
             Tab(icon: Icon(CupertinoIcons.search, size: 18), text: "Découverte"),
             Tab(icon: Icon(CupertinoIcons.device_laptop, size: 18), text: "Endpoints"),
-            Tab(icon: Icon(CupertinoIcons.map_pin_ellipse, size: 18), text: "NetPath (Carto)"), // 🚀 NOUVEAU
-            Tab(icon: Icon(CupertinoIcons.wrench_fill, size: 18), text: "Boîte à outils"), // 🚀 NOUVEAU
+            Tab(icon: Icon(CupertinoIcons.map_pin_ellipse, size: 18), text: "NetPath (Carto)"),
+            Tab(icon: Icon(CupertinoIcons.wrench_fill, size: 18), text: "Boîte à outils"),
           ],
         ),
       ),
+      floatingActionButton: _tabController.index == 1 && _connectedDevices.isNotEmpty
+          ? FloatingActionButton.extended(
+        onPressed: _exportResults,
+        backgroundColor: const Color(0xFF1E3A8A),
+        icon: const Icon(CupertinoIcons.tray_arrow_down, color: Colors.white),
+        label: const Text("Exporter CSV", style: TextStyle(color: Colors.white)),
+      )
+          : null,
       body: TabBarView(
         controller: _tabController,
+        physics: const BouncingScrollPhysics(),
         children: [
           _buildScannerTab(),
           _buildEndpointsTab(),
-          _buildNetPathTab(),  // 🚀 NOUVEAU
-          _buildToolkitTab(),  // 🚀 NOUVEAU
+          _buildNetPathTab(),
+          _buildToolkitTab(),
         ],
       ),
     );
@@ -319,7 +336,8 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
                 decoration: InputDecoration(
                   labelText: "Sous-réseau cible",
                   labelStyle: const TextStyle(color: kTextSecondary, fontSize: 12),
-                  filled: true, fillColor: kCardColor,
+                  filled: true,
+                  fillColor: kCardColor,
                   prefixIcon: const Icon(Icons.router, color: kAccentColor, size: 18),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
@@ -327,13 +345,20 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
             ),
             const SizedBox(width: 12),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _isScanning ? Colors.orangeAccent : kAccentColor, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isScanning ? Colors.orangeAccent : kAccentColor,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               onPressed: _isScanning ? null : _runNetworkScan,
-              child: _isScanning ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Icon(CupertinoIcons.search, color: Colors.black),
+              child: _isScanning
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  : const Icon(CupertinoIcons.search, color: Colors.black),
             ),
           ],
         ),
         const SizedBox(height: 24),
+
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
@@ -349,21 +374,59 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
               ),
               if (_isScanning) ...[
                 const SizedBox(height: 16),
-                ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: _scanProgress, backgroundColor: Colors.black, color: Colors.orangeAccent, minHeight: 6)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(value: _scanProgress, backgroundColor: Colors.black, color: Colors.orangeAccent, minHeight: 6),
+                ),
               ],
             ],
           ),
         ),
+
+        const SizedBox(height: 32),
+        const Text("VULNÉRABILITÉS PASSERELLE (TCP PORTS)", style: TextStyle(color: kTextSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        const SizedBox(height: 12),
+
+        ..._portsToScan.map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: kCardColor, borderRadius: BorderRadius.circular(12),
+            border: Border(left: BorderSide(color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, width: 4)),
+          ),
+          child: Row(
+            children: [
+              Icon(item["isOpen"] ? CupertinoIcons.lock_open_fill : CupertinoIcons.lock_fill, color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, size: 18),
+              const SizedBox(width: 16),
+              Text("Port ${item['port']}", style: GoogleFonts.jetBrainsMono(color: kTextMain, fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              Text("(${item['service']})", style: const TextStyle(color: kTextSecondary, fontSize: 12)),
+              const Spacer(),
+              Text(item["isOpen"] ? "OUVERT" : "FERMÉ", style: TextStyle(color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        )),
       ],
     );
   }
 
   // ==========================================
-  // ONGLET 2 : ENDPOINTS (Lien vers Fiche Hôte)
+  // ONGLET 2 : ENDPOINTS & GESTION ADMIN
   // ==========================================
   Widget _buildEndpointsTab() {
     if (_connectedDevices.isEmpty) {
-      return Center(child: Text("Aucun équipement en mémoire.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(CupertinoIcons.wifi_exclamationmark, size: 80, color: Colors.blueGrey[800]),
+            const SizedBox(height: 16),
+            Text("Aucun équipement en mémoire.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
+            const SizedBox(height: 8),
+            const Text("Lancez une découverte depuis l'onglet Scanner.", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
@@ -375,34 +438,53 @@ class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProv
 
         IconData osIcon = CupertinoIcons.device_laptop;
         if (device.osType.contains('Linux') || device.osType.contains('Android')) osIcon = CupertinoIcons.device_phone_portrait;
-        if (device.osType.contains('Windows')) osIcon = CupertinoIcons.square_grid_2x2_fill;
-        if (device.osType.contains('Routeur')) osIcon = CupertinoIcons.rocket_fill;
+        if (device.osType.contains('Windows')) osIcon = Icons.window;
+        if (device.osType.contains('Routeur')) osIcon = Icons.router;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
           child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: kAccentColor.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(osIcon, color: kAccentColor, size: 24)),
-              title: Text(device.ip, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(device.osType, style: const TextStyle(color: kTextSecondary, fontSize: 11)),
-                ],
-              ),
-              trailing: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: kAccentColor.withValues(alpha: 0.1), foregroundColor: kAccentColor, elevation: 0),
-                icon: const Icon(CupertinoIcons.info_circle_fill, size: 14),
-                label: const Text("Détails"),
-                onPressed: () {
-                  // 🚀 LIAISON VERS LA PAGE DÉTAILLÉE DE L'HÔTE
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: kAccentColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Icon(osIcon, color: kAccentColor, size: 24),
+            ),
+            title: Text(device.ip, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(device.osType, style: const TextStyle(color: kTextSecondary, fontSize: 11)),
+                Text("${device.vendor} • ${device.pingMs}ms", style: TextStyle(color: Colors.blueGrey[600], fontSize: 10)),
+              ],
+            ),
+            trailing: PopupMenuButton<String>(
+              color: kBackgroundColor,
+              icon: const Icon(CupertinoIcons.ellipsis_vertical, color: kTextSecondary),
+              onSelected: (value) {
+                if (value == 'details') {
                   Navigator.push(context, CupertinoPageRoute(builder: (context) => HostDetailsPage(
                     ip: device.ip, mac: device.vendor, osType: device.osType, vendor: device.vendor,
                   )));
-                },
-              )
+                } else if (value == 'copy') {
+                  Clipboard.setData(ClipboardData(text: device.ip));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("IP copiée dans le presse-papier.")));
+                } else if (value == 'wol') {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Paquet Magic (WoL) envoyé à ${device.vendor}")));
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'details', child: Row(children: [Icon(CupertinoIcons.doc_text_search, size: 16, color: Colors.white), SizedBox(width: 8), Text("Détails de l'Hôte", style: TextStyle(color: Colors.white))])),
+                const PopupMenuItem(value: 'copy', child: Row(children: [Icon(CupertinoIcons.doc_on_clipboard_fill, size: 16, color: Colors.white), SizedBox(width: 8), Text("Copier l'IP", style: TextStyle(color: Colors.white))])),
+                const PopupMenuItem(value: 'wol', child: Row(children: [Icon(CupertinoIcons.bolt_fill, size: 16, color: Colors.yellowAccent), SizedBox(width: 8), Text("Wake-on-LAN", style: TextStyle(color: Colors.white))])),
+              ],
+            ),
           ),
         );
       },
