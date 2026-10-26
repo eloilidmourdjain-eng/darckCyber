@@ -157,10 +157,10 @@ class _LoginPageState extends State<LoginPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
-                'assets/Logo_principal.png',
+                'assets/logo.png',
                 height: 70,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(CupertinoIcons.lock_shield_fill, color: Color(0xFF00E5FF), size: 60),
+                errorBuilder: (context, error, stackTrace) => Image.asset('assets/logo.png', height: 60, fit: BoxFit.contain),
               ),
               const SizedBox(height: 24),
               const Text("Z T N A", style: TextStyle(color: Color(0xFF00E5FF), fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 8.0)),
@@ -253,10 +253,10 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/Logo_principal.png',
+              'assets/logo.png',
               height: 70,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.shield_lefthalf_fill, color: roleColor, size: 60),
+              errorBuilder: (context, error, stackTrace) => Image.asset('assets/logo.png', height: 60, fit: BoxFit.contain),
             ),
             const SizedBox(height: 24),
             const Text("Double Facteur Requis", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),

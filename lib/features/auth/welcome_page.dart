@@ -158,7 +158,7 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                     child: Opacity(
                       opacity: 0.04, // Filigrane très léger
                       child: Center(
-                        child: Image.asset('assets/Logo_principal.png', width: 600, height: 600, fit: BoxFit.contain, errorBuilder: (c, e, s) => const Icon(CupertinoIcons.shield_lefthalf_fill, size: 600, color: Colors.white)),
+                        child: Image.asset('assets/logo.png', width: 600, height: 600, fit: BoxFit.contain, errorBuilder: (c, e, s) => const Icon(CupertinoIcons.shield_lefthalf_fill, size: 600, color: Colors.white)),
                       ),
                     ),
                   );
@@ -202,12 +202,12 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                   children: [
                                     Icon(CupertinoIcons.shield_lefthalf_fill, color: kAccentCyan, size: 16),
                                     const SizedBox(width: 10),
-                                    Expanded(child: Text("> DOCKPULSE // ARCHITECTURE SETUP", style: GoogleFonts.jetBrainsMono(color: kAccentCyan, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
+                                    Expanded(child: Text("> DOCKPULS // ARCHITECTURE SETUP", style: GoogleFonts.jetBrainsMono(color: kAccentCyan, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
                                   ],
                                 ),
                                 const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider(color: Colors.white12, height: 1, thickness: 1)),
 
-                                // --- LOGO CENTRAL (INTÉGRÉ À LA PLACE DE L'ICÔNE) ---
+                                // --- LOGO CENTRAL (REMPLACEMENT DE L'ICÔNE DE PULSATION) ---
                                 Center(
                                   child: Container(
                                     padding: const EdgeInsets.all(20),
@@ -218,8 +218,8 @@ class _WelcomePageState extends State<WelcomePage> with TickerProviderStateMixin
                                       boxShadow: [BoxShadow(color: kAccentCyan.withValues(alpha: 0.1), blurRadius: 20)],
                                     ),
                                     child: Image.asset(
-                                      'assets/Logo_principal.png',
-                                      height: 80, // Taille ajustée pour l'encadré
+                                      'assets/logo.png',
+                                      height: 80,
                                       fit: BoxFit.contain,
                                       errorBuilder: (context, error, stackTrace) => Icon(CupertinoIcons.waveform_path_ecg, size: 60, color: kAccentCyan),
                                     ),

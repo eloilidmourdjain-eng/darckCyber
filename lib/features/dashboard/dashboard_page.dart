@@ -182,7 +182,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Ticker
         children: [
           const SizedBox(height: 40),
 
-          // 🚀 LOGO STATIQUE (Pas besoin de le faire pulser ici, c'est juste le header du menu)
+          // 🚀 LOGO INTÉGRÉ DANS LE HEADER DE LA SIDEBAR
           Container(
             width: 55,
             height: 55,
@@ -193,7 +193,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> with Ticker
                 border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))
             ),
             child: Image.asset(
-              'assets/Logo_principal.png',
+              'assets/logo.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Icon(
                   CupertinoIcons.waveform_path_ecg,
@@ -435,7 +435,7 @@ class _HomeSummaryViewState extends State<HomeSummaryView> with TickerProviderSt
                       opacity: 0.04,
                       child: Center(
                         child: Image.asset(
-                          'assets/Logo_principal.png',
+                          'assets/logo.png',
                           width: 500,
                           height: 500,
                           fit: BoxFit.contain,
