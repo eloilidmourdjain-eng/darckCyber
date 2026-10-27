@@ -1,82 +1,116 @@
 import 'dart:math';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ==========================================
-// MODÈLES DE DONNÉES (Graphe & AIOps)
-// ==========================================
+// ============================================================
+// MODÈLES
+// ============================================================
+
 enum NodeType { router, server, pc, mobile, iot }
-enum AlertSeverity { info, warning, critical }
+
+enum AlertLevel { info, warning, critical }
 
 class TopologyNode {
   final String id;
   final String ip;
   final NodeType type;
-  double aiAnomalyScore; // 0.0 à 1.0
+
+  /// Score de démonstration, non produit par un modèle IA réel.
+  double demonstrationRiskScore;
+
   String statusMessage;
+
   Offset position = Offset.zero;
 
-  // Métriques simulées
   final int cpuUsage;
   final double packetLoss;
 
-  TopologyNode(this.id, this.ip, this.type, this.aiAnomalyScore, this.statusMessage, {this.cpuUsage = 10, this.packetLoss = 0.0});
+  TopologyNode(
+      this.id,
+      this.ip,
+      this.type,
+      this.demonstrationRiskScore,
+      this.statusMessage, {
+        this.cpuUsage = 10,
+        this.packetLoss = 0.0,
+      });
 }
 
 class TopologyEdge {
   final TopologyNode source;
   final TopologyNode target;
-  final double bandwidthUsage;
-  TopologyEdge(this.source, this.target, this.bandwidthUsage);
+  final double trafficPhase;
+
+  TopologyEdge(this.source, this.target, this.trafficPhase);
 }
 
-class IncidentReport {
+class ActionRecord {
   final String id;
-  final String timestamp;
+  final DateTime timestamp;
   final String targetNode;
-  final String issue;
-  final String actionTaken;
+  final String observedStatus;
+  final String requestedAction;
 
-  IncidentReport(this.id, this.timestamp, this.targetNode, this.issue, this.actionTaken);
+  ActionRecord({
+    required this.id,
+    required this.timestamp,
+    required this.targetNode,
+    required this.observedStatus,
+    required this.requestedAction,
+  });
 }
 
-// ==========================================
-// FENÊTRE PRINCIPALE
-// ==========================================
+// ============================================================
+// ÉCRAN
+// ============================================================
+
 class AITopologyScreen extends StatefulWidget {
   const AITopologyScreen({super.key});
 
   @override
-  State<AITopologyScreen> createState() => _AITopologyScreenState();
+  State<AITopologyScreen> createState() =>
+      _AITopologyScreenState();
 }
 
-class _AITopologyScreenState extends State<AITopologyScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
-  late AnimationController _trafficController;
-  late AnimationController _pulseController;
+class _AITopologyScreenState extends State<AITopologyScreen>
+    with TickerProviderStateMixin {
+  late final TabController _tabController;
+  late final AnimationController _trafficController;
+  late final AnimationController _pulseController;
 
   late List<TopologyNode> _nodes;
   late List<TopologyEdge> _edges;
 
   TopologyNode? _selectedNode;
-  bool _isRemediating = false; // Statut de traitement SOAR
-  final List<IncidentReport> _generatedReports = [];
+  bool _isSimulatingAction = false;
 
-  // Thème
-  final Color kBgColor = const Color(0xFF070B14);
-  final Color kPanelColor = const Color(0xFF131C2D);
-  final Color kCyan = const Color(0xFF00E5FF);
-  final Color kRed = const Color(0xFFFF2A55);
+  final List<ActionRecord> _actionRecords = [];
+
+  static const Color _background = Color(0xFF070B14);
+  static const Color _panel = Color(0xFF131C2D);
+  static const Color _accent = Color(0xFF00E5FF);
+  static const Color _danger = Color(0xFFFF2A55);
 
   @override
   void initState() {
     super.initState();
+
     _tabController = TabController(length: 2, vsync: this);
-    _trafficController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
-    _initializeNetworkGraph();
+
+    _trafficController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+
+    _initializeDemonstrationGraph();
   }
 
   @override
@@ -87,104 +121,243 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
     super.dispose();
   }
 
-  void _initializeNetworkGraph() {
-    TopologyNode router = TopologyNode("Gateway-Core", "192.168.1.1", NodeType.router, 0.02, "Trafic Nominal", cpuUsage: 34);
+  void _initializeDemonstrationGraph() {
+    final random = Random(7);
+
+    final router = TopologyNode(
+      'Gateway-Core',
+      '192.168.1.1',
+      NodeType.router,
+      0.02,
+      'État de démonstration : trafic nominal.',
+      cpuUsage: 34,
+    );
+
     _nodes = [router];
 
-    List<TopologyNode> devices = [
-      TopologyNode("Serveur NAS", "192.168.1.10", NodeType.server, 0.1, "Sauvegarde en cours", cpuUsage: 65),
-      TopologyNode("PC-Dev-01", "192.168.1.24", NodeType.pc, 0.0, "Idle", cpuUsage: 12),
-      TopologyNode("iPhone-CEO", "192.168.1.45", NodeType.mobile, 0.92, "Anomalie : Exfiltration de données suspectée (Trafic UDP massif)", cpuUsage: 98, packetLoss: 12.5),
-      TopologyNode("Caméra-Ext", "192.168.1.102", NodeType.iot, 0.4, "Flux vidéo instable"),
-      TopologyNode("Smart-TV", "192.168.1.130", NodeType.iot, 0.1, "En veille"),
-      TopologyNode("PC-Compta", "192.168.1.55", NodeType.pc, 0.85, "Goulot d'étranglement : Bande passante saturée (Torrent détecté)", cpuUsage: 88, packetLoss: 4.2),
-      TopologyNode("MacBook-Air", "192.168.1.60", NodeType.pc, 0.2, "Navigation Web"),
+    final devices = [
+      TopologyNode(
+        'Serveur NAS',
+        '192.168.1.10',
+        NodeType.server,
+        0.10,
+        'État de démonstration : sauvegarde en cours.',
+        cpuUsage: 65,
+      ),
+      TopologyNode(
+        'PC-Dev-01',
+        '192.168.1.24',
+        NodeType.pc,
+        0.00,
+        'État de démonstration : inactif.',
+        cpuUsage: 12,
+      ),
+      TopologyNode(
+        'Mobile-01',
+        '192.168.1.45',
+        NodeType.mobile,
+        0.92,
+        'Scénario de démonstration : trafic élevé simulé. '
+            'Aucune exfiltration réelle n’est détectée.',
+        cpuUsage: 98,
+        packetLoss: 12.5,
+      ),
+      TopologyNode(
+        'Caméra-01',
+        '192.168.1.102',
+        NodeType.iot,
+        0.40,
+        'État de démonstration : flux instable simulé.',
+      ),
+      TopologyNode(
+        'Smart-TV',
+        '192.168.1.130',
+        NodeType.iot,
+        0.10,
+        'État de démonstration : en veille.',
+      ),
+      TopologyNode(
+        'PC-02',
+        '192.168.1.55',
+        NodeType.pc,
+        0.85,
+        'Scénario de démonstration : saturation simulée.',
+        cpuUsage: 88,
+        packetLoss: 4.2,
+      ),
+      TopologyNode(
+        'PC-03',
+        '192.168.1.60',
+        NodeType.pc,
+        0.20,
+        'État de démonstration : navigation web.',
+      ),
     ];
+
     _nodes.addAll(devices);
     _edges = [];
 
-    double dynamicRadius = max(180.0, devices.length * 35.0);
-    double angleStep = (2 * pi) / devices.length;
+    final radius = max(180.0, devices.length * 35.0);
+    final angleStep = (2 * pi) / devices.length;
 
-    router.position = const Offset(0, 0);
+    router.position = Offset.zero;
+
     for (int i = 0; i < devices.length; i++) {
-      double angle = i * angleStep;
-      devices[i].position = Offset(dynamicRadius * cos(angle), dynamicRadius * sin(angle));
-      _edges.add(TopologyEdge(router, devices[i], Random().nextDouble()));
+      final angle = i * angleStep;
+
+      devices[i].position = Offset(
+        radius * cos(angle),
+        radius * sin(angle),
+      );
+
+      _edges.add(
+        TopologyEdge(
+          router,
+          devices[i],
+          random.nextDouble(),
+        ),
+      );
     }
   }
 
-  void _handleNodeTap(Offset localPosition, Size canvasCenterSize) {
-    if (_isRemediating) return; // Bloque les actions pendant une résolution
+  void _handleNodeTap(
+      Offset localPosition,
+      Size canvasSize,
+      ) {
+    if (_isSimulatingAction) return;
 
-    Offset translatedPos = localPosition - Offset(canvasCenterSize.width / 2, canvasCenterSize.height / 2);
-    for (var node in _nodes) {
-      if ((node.position - translatedPos).distance <= 35.0) {
-        setState(() => _selectedNode = node);
-        break;
+    final translated = localPosition -
+        Offset(
+          canvasSize.width / 2,
+          canvasSize.height / 2,
+        );
+
+    for (final node in _nodes) {
+      if ((node.position - translated).distance <= 35) {
+        setState(() {
+          _selectedNode = node;
+        });
+        return;
       }
     }
   }
 
-  // --- ACTIONS DE REMÉDIATION SOAR (Simulation Asynchrone) ---
-  void _executeRemediation(String actionName) async {
-    if (_selectedNode == null) return;
-    final target = _selectedNode!;
+  // ============================================================
+  // ACTION SIMULÉE
+  // ============================================================
 
-    setState(() => _isRemediating = true);
+  Future<void> _requestSimulatedAction(
+      TopologyNode node,
+      String actionLabel,
+      ) async {
+    if (_isSimulatingAction) return;
 
-    // Simulation du temps de déploiement réseau (API Firewall / Switch)
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer l’action simulée'),
+        content: Text(
+          'Cible : ${node.id} (${node.ip})\n'
+              'Action : $actionLabel\n\n'
+              'Cette démonstration ne modifie aucun équipement, '
+              'aucun pare-feu et aucun agent de sécurité.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Simuler'),
+          ),
+        ],
+      ),
+    );
+
+    if (approved != true || !mounted) return;
+
+    setState(() {
+      _isSimulatingAction = true;
+    });
+
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
 
     setState(() {
-      // 1. Génération du Rapport d'Incident
-      _generatedReports.insert(0, IncidentReport(
-          "INC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}",
-          "${DateTime.now().hour}:${DateTime.now().minute}:${DateTime.now().second}",
-          target.id,
-          target.statusMessage,
-          actionName
-      ));
+      _actionRecords.insert(
+        0,
+        ActionRecord(
+          id: 'SIM-${DateTime.now().millisecondsSinceEpoch}',
+          timestamp: DateTime.now(),
+          targetNode: node.id,
+          observedStatus: node.statusMessage,
+          requestedAction: actionLabel,
+        ),
+      );
 
-      // 2. Résolution visuelle du problème
-      target.aiAnomalyScore = 0.05;
-      target.statusMessage = "Résolu par l'opérateur ($actionName). Statut Nominal.";
+      node.demonstrationRiskScore = 0.05;
+      node.statusMessage =
+      'Action simulée : « $actionLabel ». '
+          'Aucun équipement réel n’a été modifié.';
+
       _selectedNode = null;
-      _isRemediating = false;
+      _isSimulatingAction = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Colors.greenAccent,
-      content: Row(
-        children: [
-          const Icon(CupertinoIcons.check_mark_circled_solid, color: Colors.black),
-          const SizedBox(width: 12),
-          Expanded(child: Text("Action '$actionName' appliquée avec succès sur ${target.ip}.", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
-        ],
-      ),
-    ));
+    _notify(
+      'Action simulée enregistrée pour ${node.ip}. '
+          'Aucune modification réseau réelle.',
+    );
   }
+
+  void _notify(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // ============================================================
+  // INTERFACE
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBgColor,
+      backgroundColor: _background,
       appBar: AppBar(
-        backgroundColor: kBgColor,
-        elevation: 0,
-        title: const Text('AIOps & Topologie Prédictive', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+        backgroundColor: _background,
+        title: const Text(
+          'Topologie de démonstration',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: kCyan,
-          labelColor: kCyan,
-          unselectedLabelColor: Colors.blueGrey[600],
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          indicatorColor: _accent,
+          labelColor: _accent,
+          unselectedLabelColor: Colors.blueGrey,
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
           tabs: const [
-            Tab(icon: Icon(CupertinoIcons.map_pin_ellipse, size: 18), text: "Carte Spatiale (Live)"),
-            Tab(icon: Icon(CupertinoIcons.doc_text_fill, size: 18), text: "Rapports & Audit"),
+            Tab(
+              icon: Icon(CupertinoIcons.map_pin_ellipse,
+                  size: 18),
+              text: 'Carte',
+            ),
+            Tab(
+              icon: Icon(CupertinoIcons.doc_text_fill,
+                  size: 18),
+              text: 'Actions simulées',
+            ),
           ],
         ),
       ),
@@ -194,53 +367,86 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
           physics: const NeverScrollableScrollPhysics(),
           children: [
             _buildTopologyView(),
-            _buildReportsTab(),
+            _buildRecordsTab(),
           ],
         ),
       ),
     );
   }
 
-  // ==========================================
-  // SYSTÈME DE NOTIFICATION INTÉGRÉ
-  // ==========================================
-  Widget _buildCyberAlertBanner() {
-    int criticalNodes = _nodes.where((n) => n.aiAnomalyScore > 0.8).length;
-    int warningNodes = _nodes.where((n) => n.aiAnomalyScore > 0.5 && n.aiAnomalyScore <= 0.8).length;
+  Widget _buildRiskBanner() {
+    final critical = _nodes
+        .where((node) => node.demonstrationRiskScore > 0.8)
+        .length;
 
-    if (criticalNodes == 0 && warningNodes == 0) {
-      return const SizedBox.shrink(); // Tout va bien, on cache la bannière
+    final warning = _nodes
+        .where(
+          (node) =>
+      node.demonstrationRiskScore > 0.5 &&
+          node.demonstrationRiskScore <= 0.8,
+    )
+        .length;
+
+    if (critical == 0 && warning == 0) {
+      return const SizedBox.shrink();
     }
 
-    bool isCritical = criticalNodes > 0;
-    Color accentColor = isCritical ? kRed : Colors.orangeAccent;
-    IconData icon = isCritical ? CupertinoIcons.exclamationmark_triangle_fill : CupertinoIcons.exclamationmark_shield_fill;
-    String title = isCritical ? "MENACE CRITIQUE DÉTECTÉE" : "AVERTISSEMENT RÉSEAU";
-    String message = isCritical
-        ? "L'IA a détecté $criticalNodes nœud(s) avec un comportement malveillant (Exfiltration/Surcharge). Action immédiate requise."
-        : "$warningNodes nœud(s) présentent une dégradation de performance.";
+    final isCritical = critical > 0;
+    final color =
+    isCritical ? _danger : Colors.orangeAccent;
 
-    Widget alertContent = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    final message = isCritical
+        ? '$critical nœud(s) de démonstration présentent '
+        'un score élevé. Il ne s’agit pas d’une détection '
+        'réelle.'
+        : '$warning nœud(s) de démonstration présentent '
+        'un score intermédiaire.';
+
+    final content = Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 16,
+      ),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF131C2D),
+        color: _panel,
         borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: accentColor, width: 4)),
-        boxShadow: isCritical ? [BoxShadow(color: accentColor.withValues(alpha: 0.2), blurRadius: 15, spreadRadius: -2)] : [],
+        border: Border(
+          left: BorderSide(color: color, width: 4),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: accentColor, size: 24),
+          Icon(
+            isCritical
+                ? CupertinoIcons.exclamationmark_triangle_fill
+                : CupertinoIcons.exclamationmark_shield_fill,
+            color: color,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+                Text(
+                  isCritical
+                      ? 'SCORE ÉLEVÉ — DÉMONSTRATION'
+                      : 'SCORE INTERMÉDIAIRE — DÉMONSTRATION',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(message, style: TextStyle(color: Colors.blueGrey[300], fontSize: 11, height: 1.4)),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
@@ -248,146 +454,273 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
       ),
     );
 
-    return isCritical ? AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) => Transform.scale(scale: 1.0 + (_pulseController.value * 0.02), child: alertContent)
-    ) : alertContent;
+    if (!isCritical) return content;
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) => Transform.scale(
+        scale: 1 + (_pulseController.value * 0.02),
+        child: child,
+      ),
+      child: content,
+    );
   }
 
-  // ==========================================
-  // ONGLET 1 : TOPOLOGIE ET PANNEAU D'ACTION
-  // ==========================================
   Widget _buildTopologyView() {
-    const Size canvasSize = Size(1800, 1800);
+    const canvasSize = Size(1800, 1800);
 
     return Stack(
       children: [
-        // MOTEUR DE RENDU INTERACTIF
         InteractiveViewer(
-          minScale: 0.4, maxScale: 3.0,
+          minScale: 0.4,
+          maxScale: 3,
           boundaryMargin: const EdgeInsets.all(800),
           constrained: false,
           child: GestureDetector(
-            onTapUp: (details) => _handleNodeTap(details.localPosition, canvasSize),
+            onTapUp: (details) => _handleNodeTap(
+              details.localPosition,
+              canvasSize,
+            ),
             child: SizedBox(
-              width: canvasSize.width, height: canvasSize.height,
+              width: canvasSize.width,
+              height: canvasSize.height,
               child: AnimatedBuilder(
                 animation: _trafficController,
-                builder: (context, child) => CustomPaint(painter: NetworkTopologyPainter(_nodes, _edges, _trafficController.value)),
+                builder: (context, child) => CustomPaint(
+                  painter: NetworkTopologyPainter(
+                    _nodes,
+                    _edges,
+                    _trafficController.value,
+                  ),
+                ),
               ),
             ),
           ),
         ),
-
-        // NOTIFICATION BANNER TOP
         Positioned(
-          top: 0, left: 0, right: 0,
+          top: 0,
+          left: 0,
+          right: 0,
           child: Column(
             children: [
-              _buildCyberAlertBanner(),
-              // Bouton Recenter
+              _buildRiskBanner(),
               Align(
                 alignment: Alignment.topRight,
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 24, top: 8),
-                  child: Container(
-                    decoration: BoxDecoration(color: kPanelColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
-                    child: IconButton(icon: Icon(CupertinoIcons.viewfinder, color: kCyan), tooltip: "Recentrer la vue", onPressed: () => setState(() => _selectedNode = null)),
+                  padding: const EdgeInsets.only(
+                    right: 24,
+                    top: 8,
+                  ),
+                  child: IconButton(
+                    tooltip:
+                    'Désélectionner le nœud affiché',
+                    onPressed: () {
+                      setState(() {
+                        _selectedNode = null;
+                      });
+                    },
+                    icon: const Icon(
+                      CupertinoIcons.viewfinder,
+                      color: _accent,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
         ),
-
-        // PANNEAU D'INTERVENTION MODAL (Drill-Down)
         if (_selectedNode != null)
           Positioned(
-            bottom: 24, left: 24, right: 24,
-            child: _buildRemediationModal(),
+            bottom: 24,
+            left: 24,
+            right: 24,
+            child: _buildNodePanel(),
           ),
       ],
     );
   }
 
-  // LE PANNEAU DE REMÉDIATION (SOAR TOOLKIT)
-  Widget _buildRemediationModal() {
+  Widget _buildNodePanel() {
     final node = _selectedNode!;
-    final isCritical = node.aiAnomalyScore > 0.8;
-    final color = isCritical ? kRed : kCyan;
+    final isCritical =
+        node.demonstrationRiskScore > 0.8;
+    final color = isCritical ? _danger : _accent;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        filter: ImageFilter.blur(
+          sigmaX: 15,
+          sigmaY: 15,
+        ),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: kPanelColor.withValues(alpha: 0.85),
+            color: _panel.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 30, offset: const Offset(0, 10))],
+            border: Border.all(
+              color: color.withValues(alpha: 0.5),
+            ),
           ),
-          child: _isRemediating
-              ? _buildRemediationProgress() // État de chargement
-              : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: _isSimulatingAction
+              ? const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // --- HEADER MODAL ---
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Simulation en cours. '
+                    'Aucun équipement n’est contacté.',
+                style: TextStyle(
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          )
+              : Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(CupertinoIcons.device_laptop, color: color, size: 24)),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(node.id, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                          Text(node.ip, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[300], fontSize: 12)),
-                        ],
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          node.id,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Text(
+                          node.ip,
+                          style: GoogleFonts
+                              .jetBrainsMono(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  IconButton(icon: const Icon(CupertinoIcons.clear_circled_solid, color: Colors.blueGrey), onPressed: () => setState(() => _selectedNode = null))
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedNode = null;
+                      });
+                    },
+                    icon: const Icon(
+                      CupertinoIcons.clear_circled,
+                      color: Colors.white54,
+                    ),
+                  ),
                 ],
               ),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(color: Colors.white12, height: 1)),
-
-              // --- ANALYSE IA (RCA) ---
-              const Text("ROOT CAUSE ANALYSIS (IA)", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              const Divider(color: Colors.white12),
+              const Text(
+                'ÉTAT DE DÉMONSTRATION',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text(node.statusMessage, style: TextStyle(color: isCritical ? kRed : Colors.white70, fontSize: 13, fontWeight: isCritical ? FontWeight.bold : FontWeight.normal)),
+              Text(
+                node.statusMessage,
+                style: TextStyle(
+                  color: isCritical
+                      ? _danger
+                      : Colors.white70,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 16),
-
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment:
+                MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMiniMetric("Score IA", "${(node.aiAnomalyScore * 100).toInt()}%", color),
-                  _buildMiniMetric("CPU Usage", "${node.cpuUsage}%", node.cpuUsage > 80 ? Colors.orangeAccent : kCyan),
-                  _buildMiniMetric("Packet Loss", "${node.packetLoss}%", node.packetLoss > 5.0 ? kRed : kCyan),
+                  _metric(
+                    'Score de démonstration',
+                    '${(node.demonstrationRiskScore * 100).round()}%',
+                    color,
+                  ),
+                  _metric(
+                    'CPU simulé',
+                    '${node.cpuUsage}%',
+                    node.cpuUsage > 80
+                        ? Colors.orangeAccent
+                        : _accent,
+                  ),
+                  _metric(
+                    'Perte simulée',
+                    '${node.packetLoss}%',
+                    node.packetLoss > 5
+                        ? _danger
+                        : _accent,
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // --- ARSENAL DE REMÉDIATION (SOAR) ---
-              const Text("OUTILS DE RÉSOLUTION (SOAR PLAYBOOKS)", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              const SizedBox(height: 20),
+              const Text(
+                'ACTIONS SIMULÉES',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
-
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
-                childAspectRatio: 3.0,
+                childAspectRatio: 3,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
-                physics: const NeverScrollableScrollPhysics(),
+                physics:
+                const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildActionBtn("Micro-Segmentation (Zero Trust)", CupertinoIcons.shield_lefthalf_fill, kRed, "Isolation VLAN L2"),
-                  _buildActionBtn("Activer Deep Packet Inspection", CupertinoIcons.waveform_path_ecg, Colors.orangeAccent, "Routage vers IA"),
-                  _buildActionBtn("Throttling (QoS 1Mbps)", CupertinoIcons.speedometer, Colors.purpleAccent, "Brider Bande Passante"),
-                  _buildActionBtn("Trigger EDR Agent (Kill Process)", CupertinoIcons.ant_fill, kCyan, "Nettoyage Endpoint"),
+                  _actionButton(
+                    'Isolation simulée',
+                    CupertinoIcons.shield_lefthalf_fill,
+                    _danger,
+                        () => _requestSimulatedAction(
+                      node,
+                      'Isolation simulée',
+                    ),
+                  ),
+                  _actionButton(
+                    'Inspection simulée',
+                    CupertinoIcons.waveform_path_ecg,
+                    Colors.orangeAccent,
+                        () => _requestSimulatedAction(
+                      node,
+                      'Inspection approfondie simulée',
+                    ),
+                  ),
+                  _actionButton(
+                    'Limitation simulée',
+                    CupertinoIcons.speedometer,
+                    Colors.purpleAccent,
+                        () => _requestSimulatedAction(
+                      node,
+                      'Limitation de débit simulée',
+                    ),
+                  ),
+                  _actionButton(
+                    'Vérification simulée',
+                    CupertinoIcons.ant,
+                    _accent,
+                        () => _requestSimulatedAction(
+                      node,
+                      'Vérification endpoint simulée',
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -397,207 +730,366 @@ class _AITopologyScreenState extends State<AITopologyScreen> with TickerProvider
     );
   }
 
-  // Barre de progression pendant l'exécution de l'action
-  Widget _buildRemediationProgress() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      alignment: Alignment.center,
-      child: Column(
-        children: [
-          const CircularProgressIndicator(color: Color(0xFF00E5FF)),
-          const SizedBox(height: 20),
-          Text("Injection des règles réseaux (API Controller)...", style: GoogleFonts.jetBrainsMono(color: const Color(0xFF00E5FF), fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionBtn(String label, IconData icon, Color color, String actionId) {
-    return ElevatedButton.icon(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.15),
+  Widget _actionButton(
+      String label,
+      IconData icon,
+      Color color,
+      VoidCallback onPressed,
+      ) {
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
         foregroundColor: color,
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        side: BorderSide(
+          color: color.withValues(alpha: 0.5),
+        ),
         alignment: Alignment.centerLeft,
       ),
+      onPressed: onPressed,
       icon: Icon(icon, size: 14),
-      label: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-      onPressed: () => _executeRemediation(actionId),
+      label: Text(
+        label,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
-  Widget _buildMiniMetric(String label, String value, Color color) {
+  Widget _metric(
+      String label,
+      String value,
+      Color color,
+      ) {
     return Column(
       children: [
-        Text(value, style: GoogleFonts.jetBrainsMono(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: GoogleFonts.jetBrainsMono(
+            color: color,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: Colors.blueGrey[400], fontSize: 10)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white38,
+            fontSize: 10,
+          ),
+        ),
       ],
     );
   }
 
-  // ==========================================
-  // ONGLET 2 : RAPPORTS ET AUDIT
-  // ==========================================
-  Widget _buildReportsTab() {
+  Widget _buildRecordsTab() {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Registres de Remédiation IA", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: kPanelColor, foregroundColor: kCyan, side: BorderSide(color: kCyan.withValues(alpha: 0.5))),
-                icon: const Icon(CupertinoIcons.cloud_download, size: 16),
-                label: const Text("Exporter (PDF)"),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Le rapport PDF a été généré et téléchargé avec succès.")));
+              const Expanded(
+                child: Text(
+                  'Registre des actions simulées',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              OutlinedButton(
+                onPressed: _actionRecords.isEmpty
+                    ? null
+                    : () {
+                  setState(() {
+                    _actionRecords.clear();
+                  });
                 },
-              )
+                child: const Text('Vider le registre'),
+              ),
             ],
           ),
         ),
         Expanded(
-          child: _generatedReports.isEmpty
-              ? Center(child: Text("Aucun incident résolu pour le moment.", style: TextStyle(color: Colors.blueGrey[600])))
+          child: _actionRecords.isEmpty
+              ? const Center(
+            child: Text(
+              'Aucune action simulée pour le moment.',
+              style: TextStyle(color: Colors.white38),
+            ),
+          )
               : ListView.builder(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: _generatedReports.length,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+            ),
+            itemCount: _actionRecords.length,
             itemBuilder: (context, index) {
-              final report = _generatedReports[index];
+              final record = _actionRecords[index];
+
               return Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin:
+                const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: kPanelColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+                decoration: BoxDecoration(
+                  color: _panel,
+                  borderRadius:
+                  BorderRadius.circular(12),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment:
+                      MainAxisAlignment
+                          .spaceBetween,
                       children: [
-                        Text(report.id, style: GoogleFonts.jetBrainsMono(color: kCyan, fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text(report.timestamp, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[500], fontSize: 10)),
+                        Text(
+                          record.id,
+                          style: GoogleFonts
+                              .jetBrainsMono(
+                            color: _accent,
+                            fontSize: 12,
+                            fontWeight:
+                            FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          record.timestamp
+                              .toLocal()
+                              .toString(),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text("Cible: ${report.targetNode}", style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Cible : ${record.targetNode}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text("Cause IA: ${report.issue}", style: TextStyle(color: Colors.blueGrey[300], fontSize: 11)),
+                    Text(
+                      'État observé : '
+                          '${record.observedStatus}',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.greenAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                      child: Row(
-                        children: [
-                          const Icon(CupertinoIcons.check_mark_circled_solid, color: Colors.greenAccent, size: 14),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text("Playbook Exécuté: ${report.actionTaken}", style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold))),
-                        ],
+                      decoration: BoxDecoration(
+                        color: Colors.orangeAccent
+                            .withValues(alpha: 0.1),
+                        borderRadius:
+                        BorderRadius.circular(6),
                       ),
-                    )
+                      child: Text(
+                        'Action simulée demandée : '
+                            '${record.requestedAction}',
+                        style: const TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               );
             },
           ),
-        )
+        ),
       ],
     );
   }
 }
 
-// ==========================================
-// MOTEUR GRAPHIQUE (Optimisé Flutter 3.24)
-// ==========================================
+// ============================================================
+// DESSIN DE LA TOPOLOGIE
+// ============================================================
+
 class NetworkTopologyPainter extends CustomPainter {
   final List<TopologyNode> nodes;
   final List<TopologyEdge> edges;
   final double animationValue;
 
-  NetworkTopologyPainter(this.nodes, this.edges, this.animationValue);
+  NetworkTopologyPainter(
+      this.nodes,
+      this.edges,
+      this.animationValue,
+      );
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.translate(size.width / 2, size.height / 2);
 
-    for (var edge in edges) {
-      bool isCritical = edge.target.aiAnomalyScore > 0.8;
-      bool isWarning = edge.target.aiAnomalyScore > 0.5 && edge.target.aiAnomalyScore <= 0.8;
+    for (final edge in edges) {
+      final risk =
+          edge.target.demonstrationRiskScore;
 
-      Color lineColor = isCritical ? const Color(0xFFFF2A55) : (isWarning ? Colors.orangeAccent : const Color(0xFF00E5FF));
+      final Color lineColor;
 
-      final paintLine = Paint()
-        ..color = lineColor.withValues(alpha: 0.3)
-        ..strokeWidth = 2.0
-        ..style = PaintingStyle.stroke;
-      canvas.drawLine(edge.source.position, edge.target.position, paintLine);
-
-      double progress = (animationValue + edge.bandwidthUsage) % 1.0;
-      double packetX = edge.source.position.dx + (edge.target.position.dx - edge.source.position.dx) * progress;
-      double packetY = edge.source.position.dy + (edge.target.position.dy - edge.source.position.dy) * progress;
-
-      final paintPacket = Paint()
-        ..color = lineColor
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-      canvas.drawCircle(Offset(packetX, packetY), 3.5, paintPacket);
-    }
-
-    for (var node in nodes) {
-      Color nodeColor = const Color(0xFF00E5FF);
-      if (node.aiAnomalyScore > 0.8) {
-        nodeColor = const Color(0xFFFF2A55);
-      } else if (node.aiAnomalyScore > 0.5) nodeColor = Colors.orangeAccent;
-
-      double nodeRadius = node.type == NodeType.router ? 32.0 : 22.0;
-
-      final paintGlow = Paint()
-        ..color = nodeColor.withValues(alpha: 0.25)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, node.aiAnomalyScore > 0.5 ? 16.0 : 8.0);
-      canvas.drawCircle(node.position, nodeRadius + 8, paintGlow);
-
-      final paintNode = Paint()..color = const Color(0xFF131C2D);
-      final paintBorder = Paint()
-        ..color = nodeColor
-        ..strokeWidth = 2.5
-        ..style = PaintingStyle.stroke;
-
-      canvas.drawCircle(node.position, nodeRadius, paintNode);
-      canvas.drawCircle(node.position, nodeRadius, paintBorder);
-
-      IconData icon;
-      switch (node.type) {
-        case NodeType.router: icon = CupertinoIcons.rocket_fill; break;
-        case NodeType.server: icon = Icons.dns; break;
-        case NodeType.mobile: icon = CupertinoIcons.device_phone_portrait; break;
-        case NodeType.iot: icon = CupertinoIcons.video_camera; break;
-        case NodeType.pc: icon = CupertinoIcons.device_desktop; break;
+      if (risk > 0.8) {
+        lineColor = const Color(0xFFFF2A55);
+      } else if (risk > 0.5) {
+        lineColor = Colors.orangeAccent;
+      } else {
+        lineColor = const Color(0xFF00E5FF);
       }
 
-      TextPainter textPainter = TextPainter(
-        text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: nodeRadius * 0.8, fontFamily: icon.fontFamily, package: icon.fontPackage, color: Colors.white)),
+      final linePaint = Paint()
+        ..color = lineColor.withValues(alpha: 0.3)
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(
+        edge.source.position,
+        edge.target.position,
+        linePaint,
+      );
+
+      final progress =
+          (animationValue + edge.trafficPhase) % 1;
+
+      final packetPosition = Offset(
+        edge.source.position.dx +
+            (edge.target.position.dx -
+                edge.source.position.dx) *
+                progress,
+        edge.source.position.dy +
+            (edge.target.position.dy -
+                edge.source.position.dy) *
+                progress,
+      );
+
+      canvas.drawCircle(
+        packetPosition,
+        3.5,
+        Paint()
+          ..color = lineColor
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            4,
+          ),
+      );
+    }
+
+    for (final node in nodes) {
+      final risk = node.demonstrationRiskScore;
+
+      Color nodeColor = const Color(0xFF00E5FF);
+
+      if (risk > 0.8) {
+        nodeColor = const Color(0xFFFF2A55);
+      } else if (risk > 0.5) {
+        nodeColor = Colors.orangeAccent;
+      }
+
+      final radius =
+      node.type == NodeType.router ? 32.0 : 22.0;
+
+      canvas.drawCircle(
+        node.position,
+        radius + 8,
+        Paint()
+          ..color = nodeColor.withValues(alpha: 0.25)
+          ..maskFilter = MaskFilter.blur(
+            BlurStyle.normal,
+            risk > 0.5 ? 16 : 8,
+          ),
+      );
+
+      canvas.drawCircle(
+        node.position,
+        radius,
+        Paint()..color = const Color(0xFF131C2D),
+      );
+
+      canvas.drawCircle(
+        node.position,
+        radius,
+        Paint()
+          ..color = nodeColor
+          ..strokeWidth = 2.5
+          ..style = PaintingStyle.stroke,
+      );
+
+      final icon = switch (node.type) {
+        NodeType.router => CupertinoIcons.rocket_fill,
+        NodeType.server => Icons.dns,
+        NodeType.mobile =>
+        CupertinoIcons.device_phone_portrait,
+        NodeType.iot => CupertinoIcons.video_camera,
+        NodeType.pc => CupertinoIcons.device_desktop,
+      };
+
+      final iconPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(icon.codePoint),
+          style: TextStyle(
+            fontSize: radius * 0.8,
+            fontFamily: icon.fontFamily,
+            package: icon.fontPackage,
+            color: Colors.white,
+          ),
+        ),
         textDirection: TextDirection.ltr,
       );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(node.position.dx - (textPainter.width / 2), node.position.dy - (textPainter.height / 2)));
 
-      TextPainter labelPainter = TextPainter(
+      iconPainter.layout();
+
+      iconPainter.paint(
+        canvas,
+        Offset(
+          node.position.dx - iconPainter.width / 2,
+          node.position.dy - iconPainter.height / 2,
+        ),
+      );
+
+      final labelPainter = TextPainter(
         text: TextSpan(
-          text: "${node.id}\n${node.ip}",
-          style: GoogleFonts.jetBrainsMono(color: Colors.white70, fontSize: 10, height: 1.2),
+          text: '${node.id}\n${node.ip}',
+          style: GoogleFonts.jetBrainsMono(
+            color: Colors.white70,
+            fontSize: 10,
+            height: 1.2,
+          ),
         ),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
       );
+
       labelPainter.layout();
-      labelPainter.paint(canvas, Offset(node.position.dx - (labelPainter.width / 2), node.position.dy + nodeRadius + 8));
+
+      labelPainter.paint(
+        canvas,
+        Offset(
+          node.position.dx - labelPainter.width / 2,
+          node.position.dy + radius + 8,
+        ),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant NetworkTopologyPainter oldDelegate) => oldDelegate.animationValue != animationValue;
+  bool shouldRepaint(
+      covariant NetworkTopologyPainter oldDelegate,
+      ) {
+    return oldDelegate.animationValue != animationValue ||
+        oldDelegate.nodes != nodes ||
+        oldDelegate.edges != edges;
+  }
 }
