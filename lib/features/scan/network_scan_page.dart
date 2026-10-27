@@ -1,166 +1,164 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:dart_ping/dart_ping.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
-import 'package:darck_puls/features/scan/host_details_page.dart'; // 👈 Fiche détaillée de l'hôte
-
-// --- THÈME CYBER ---
 const Color kBackgroundColor = Color(0xFF070B14);
 const Color kCardColor = Color(0xFF131C2D);
 const Color kAccentColor = Color(0xFF00E5FF);
 const Color kTextMain = Colors.white;
 const Color kTextSecondary = Color(0xFF94A3B8);
 
-// ==========================================
-// 1. MOTEUR DE DÉCOUVERTE RÉSEAU (ALGORITHME OPTIMISÉ)
-// ==========================================
-class NetworkDevice {
-  final String ip;
-  final int pingMs;
-  final int ttl;
-  List<int> openPorts;
-  String vendor;
-  String osType;
+// ============================================================
+// MODÈLES
+// ============================================================
 
-  NetworkDevice({
-    required this.ip,
-    required this.pingMs,
-    required this.ttl,
-    this.openPorts = const [],
-    this.vendor = 'Unknown MAC',
-    this.osType = 'Unknown',
+class TcpPortResult {
+  final int port;
+  final bool connected;
+  final int? connectionMs;
+  final String status;
+
+  const TcpPortResult({
+    required this.port,
+    required this.connected,
+    required this.status,
+    this.connectionMs,
   });
 }
 
-class NetworkDiscoveryService {
-  final NetworkInfo _networkInfo = NetworkInfo();
+class NetworkDevice {
+  final String ip;
+  final List<TcpPortResult> checks;
+  final DateTime checkedAt;
 
-  Future<String?> getLocalSubnet() async {
-    try {
-      final ipAddress = await _networkInfo.getWifiIP();
-      if (ipAddress != null && ipAddress.contains('.')) {
-        List<String> parts = ipAddress.split('.');
-        parts.removeLast();
-        return parts.join('.');
-      }
-    } catch (e) {
-      debugPrint("Erreur récupération IP: $e");
+  const NetworkDevice({
+    required this.ip,
+    required this.checks,
+    required this.checkedAt,
+  });
+
+  List<int> get openPorts => checks
+      .where((result) => result.connected)
+      .map((result) => result.port)
+      .toList();
+
+  int? get connectionMs {
+    for (final result in checks) {
+      if (result.connected) return result.connectionMs;
     }
     return null;
-  }
-
-  Future<List<NetworkDevice>> scanSubnet(String subnet, {Function(double progress)? onProgress}) async {
-    List<NetworkDevice> activeDevices = [];
-    int completedTasks = 0;
-    int totalIps = 254;
-
-    // 🚀 L'ASTUCE PRO : Le Batching (Scanne par lots de 30 pour ne pas faire crasher Windows)
-    int batchSize = 30;
-
-    for (int i = 1; i <= totalIps; i += batchSize) {
-      List<Future<void>> currentBatch = [];
-
-      for (int j = i; j < i + batchSize && j <= totalIps; j++) {
-        final targetIp = '$subnet.$j';
-
-        currentBatch.add(
-          _pingAndDiscover(targetIp).then((device) {
-            completedTasks++;
-            if (onProgress != null) onProgress(completedTasks / totalIps);
-            if (device != null) activeDevices.add(device);
-          }).catchError((_) {
-            completedTasks++;
-            if (onProgress != null) onProgress(completedTasks / totalIps);
-          }),
-        );
-      }
-
-      // On attend que les 30 pings soient finis avant de lancer les 30 suivants
-      await Future.wait(currentBatch);
-    }
-
-    // Tri IP croissant
-    activeDevices.sort((a, b) {
-      int ipA = int.parse(a.ip.split('.').last);
-      int ipB = int.parse(b.ip.split('.').last);
-      return ipA.compareTo(ipB);
-    });
-
-    return activeDevices;
-  }
-
-  Future<NetworkDevice?> _pingAndDiscover(String ip) async {
-    try {
-      final ping = Ping(ip, count: 1, timeout: 1); // Timeout agressif
-
-      // 🚀 SYNTAXE DART 3 SÉCURISÉE
-      await for (final event in ping.stream) {
-        if (event is PingResponse && event.time != null) {
-          int pingTime = event.time!.inMilliseconds;
-          int ttl = event.ttl ?? 64;
-
-          String osGuess = _guessOsByTtl(ttl);
-          NetworkDevice device = NetworkDevice(ip: ip, pingMs: pingTime, ttl: ttl, osType: osGuess);
-
-          device.openPorts = await _quickPortScan(ip);
-
-          if (device.osType == 'Unknown' && device.openPorts.contains(80)) device.osType = 'Web Server / IoT';
-          if (ip.endsWith('.1') || ip.endsWith('.254')) device.osType = 'Passerelle / Routeur';
-
-          if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-            device.vendor = await _getMacFromArp(ip);
-          } else {
-            device.vendor = "MAC masquée (OS Mobile)";
-          }
-          return device;
-        }
-      }
-    } catch (e) {
-      // Ignoré silencieusement
-    }
-    return null;
-  }
-
-  String _guessOsByTtl(int ttl) {
-    if (ttl <= 64) return 'Linux / Android / macOS';
-    if (ttl > 64 && ttl <= 128) return 'Windows';
-    if (ttl > 128 && ttl <= 255) return 'Cisco / Network Equip.';
-    return 'Unknown';
-  }
-
-  Future<List<int>> _quickPortScan(String ip) async {
-    List<int> openPorts = [];
-    List<int> portsToCheck = [21, 22, 53, 80, 443, 445, 3389, 8080];
-
-    for (int port in portsToCheck) {
-      try {
-        final socket = await Socket.connect(ip, port, timeout: const Duration(milliseconds: 250));
-        openPorts.add(port);
-        socket.destroy();
-      } catch (e) {}
-    }
-    return openPorts;
-  }
-
-  Future<String> _getMacFromArp(String ip) async {
-    try {
-      ProcessResult result = await Process.run(Platform.isWindows ? 'arp' : 'arp', [Platform.isWindows ? '-a' : '-n', ip]);
-      RegExp macRegex = RegExp(r'([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2})');
-      var match = macRegex.firstMatch(result.stdout.toString());
-      if (match != null) return match.group(0)!.toUpperCase().replaceAll('-', ':');
-    } catch (e) {}
-    return "Unknown MAC";
   }
 }
 
-// ==========================================
-// 2. L'INTERFACE UTILISATEUR (UI/UX)
-// ==========================================
+// ============================================================
+// SERVICE TCP
+// ============================================================
+
+class NetworkDiscoveryService {
+  bool _cancelled = false;
+
+  void cancel() {
+    _cancelled = true;
+  }
+
+  Future<TcpPortResult> _checkPort(
+      String ip,
+      int port,
+      Duration timeout,
+      ) async {
+    Socket? socket;
+    final watch = Stopwatch()..start();
+
+    try {
+      socket = await Socket.connect(ip, port, timeout: timeout);
+      watch.stop();
+
+      return TcpPortResult(
+        port: port,
+        connected: true,
+        connectionMs: watch.elapsedMilliseconds,
+        status: 'Connexion établie',
+      );
+    } on TimeoutException {
+      return TcpPortResult(
+        port: port,
+        connected: false,
+        status: 'Délai dépassé',
+      );
+    } on SocketException catch (e) {
+      return TcpPortResult(
+        port: port,
+        connected: false,
+        status: 'Connexion non établie : ${e.message}',
+      );
+    } catch (e) {
+      return TcpPortResult(
+        port: port,
+        connected: false,
+        status: 'Erreur : $e',
+      );
+    } finally {
+      watch.stop();
+      socket?.destroy();
+    }
+  }
+
+  Future<void> scan({
+    required List<String> targets,
+    required List<int> ports,
+    required Duration timeout,
+    required void Function(int completed, int total) onProgress,
+    required void Function(NetworkDevice device) onChecked,
+    int concurrency = 8,
+  }) async {
+    _cancelled = false;
+
+    int nextIndex = 0;
+    int completed = 0;
+
+    Future<void> worker() async {
+      while (!_cancelled && nextIndex < targets.length) {
+        final ip = targets[nextIndex++];
+        final checks = <TcpPortResult>[];
+
+        for (final port in ports) {
+          if (_cancelled) break;
+          checks.add(await _checkPort(ip, port, timeout));
+        }
+
+        // Ne pas présenter un hôte partiellement vérifié comme terminé.
+        if (_cancelled) return;
+
+        onChecked(
+          NetworkDevice(
+            ip: ip,
+            checks: checks,
+            checkedAt: DateTime.now(),
+          ),
+        );
+
+        completed++;
+        onProgress(completed, targets.length);
+      }
+    }
+
+    final workerCount =
+    targets.length < concurrency ? targets.length : concurrency;
+
+    await Future.wait(
+      List.generate(workerCount, (_) => worker()),
+    );
+  }
+}
+
+// ============================================================
+// PAGE
+// ============================================================
+
 class NetworkScanPage extends StatefulWidget {
   const NetworkScanPage({super.key});
 
@@ -168,476 +166,914 @@ class NetworkScanPage extends StatefulWidget {
   State<NetworkScanPage> createState() => _NetworkScanPageState();
 }
 
-class _NetworkScanPageState extends State<NetworkScanPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _ipController = TextEditingController();
-  final NetworkDiscoveryService _discoveryService = NetworkDiscoveryService();
+class _NetworkScanPageState extends State<NetworkScanPage> {
+  final _targetController =
+  TextEditingController(text: '10.237.245.171');
 
-  // Scanner States
+  final _portsController =
+  TextEditingController(text: '22,80,443,8080');
+
+  final _toolTargetController =
+  TextEditingController(text: '10.237.245.171');
+
+  final _routeTargetController =
+  TextEditingController(text: '10.237.245.171');
+
+  final _scanner = NetworkDiscoveryService();
+
+  final List<NetworkDevice> _checkedDevices = [];
+
   bool _isScanning = false;
-  double _scanProgress = 0.0;
-  String _pingResult = "Prêt à auditer le réseau local.";
-  int? _pingLatencyMs;
-  List<NetworkDevice> _connectedDevices = [];
+  bool _stopRequested = false;
+  bool _showAll = false;
+  bool _authorized = false;
+  bool _toolRunning = false;
 
-  // Toolkit States
-  final TextEditingController _toolTargetController = TextEditingController();
-  String _toolConsoleOutput = "Sélectionnez un outil et entrez une cible.";
-  bool _isToolRunning = false;
+  int _completed = 0;
+  int _total = 0;
+  int _timeoutMs = 1200;
 
-  final List<Map<String, dynamic>> _portsToScan = [
-    {"port": 21, "service": "FTP", "isOpen": false},
-    {"port": 22, "service": "SSH", "isOpen": true},
-    {"port": 80, "service": "HTTP", "isOpen": true},
-    {"port": 443, "service": "HTTPS", "isOpen": true},
-    {"port": 445, "service": "SMB", "isOpen": false},
-    {"port": 3389, "service": "RDP", "isOpen": false},
-  ];
+  String _status = 'Prêt. Commence par une seule adresse autorisée.';
+  String _console = 'Aucun outil lancé.';
+  String _routeOutput = 'Aucun traceroute exécuté.';
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this); // 🚀 4 ONGLETS D'AUDIT
-    _initializeSubnet();
+  Process? _process;
+  Timer? _processTimer;
+
+  bool get _desktop =>
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  List<NetworkDevice> get _visibleDevices {
+    final devices = _checkedDevices
+        .where((device) => _showAll || device.openPorts.isNotEmpty)
+        .toList();
+
+    devices.sort((a, b) {
+      final aa = a.ip.split('.').map(int.parse).toList();
+      final bb = b.ip.split('.').map(int.parse).toList();
+
+      for (int i = 0; i < 4; i++) {
+        final comparison = aa[i].compareTo(bb[i]);
+        if (comparison != 0) return comparison;
+      }
+      return 0;
+    });
+
+    return devices;
   }
 
-  Future<void> _initializeSubnet() async {
-    final subnet = await _discoveryService.getLocalSubnet();
-    if (mounted) {
-      setState(() {
-        _ipController.text = subnet != null ? "$subnet.0/24" : "192.168.1.0/24";
-      });
-    }
-  }
+  int get _reachableCount => _checkedDevices
+      .where((device) => device.openPorts.isNotEmpty)
+      .length;
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _ipController.dispose();
+    _scanner.cancel();
+    _processTimer?.cancel();
+    _process?.kill();
+
+    _targetController.dispose();
+    _portsController.dispose();
     _toolTargetController.dispose();
+    _routeTargetController.dispose();
+
     super.dispose();
   }
 
-  Future<void> _runNetworkScan() async {
-    String input = _ipController.text.replaceAll('/24', '').trim();
-    String subnet = "192.168.1";
+  void _notify(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
 
-    if (input.contains('.')) {
-      List<String> parts = input.split('.');
-      if (parts.length >= 3) subnet = "${parts[0]}.${parts[1]}.${parts[2]}";
+  bool _isIpv4(String value) {
+    final parts = value.split('.');
+    if (parts.length != 4) return false;
+
+    return parts.every((part) {
+      if (!RegExp(r'^\d{1,3}$').hasMatch(part)) return false;
+      final number = int.tryParse(part);
+      return number != null && number >= 0 && number <= 255;
+    });
+  }
+
+  List<String> _parseTargets(String raw) {
+    final input = raw.trim();
+
+    if (input.endsWith('/24')) {
+      final address = input.substring(0, input.length - 3).trim();
+
+      if (!_isIpv4(address)) {
+        throw const FormatException('Adresse IPv4 invalide.');
+      }
+
+      final prefix = address.split('.').take(3).join('.');
+      return List.generate(254, (index) => '$prefix.${index + 1}');
+    }
+
+    if (!_isIpv4(input)) {
+      throw const FormatException(
+        'Utilise une IPv4 seule ou une IPv4 suivie de /24.',
+      );
+    }
+
+    return [input];
+  }
+
+  List<int> _parsePorts() {
+    final values = _portsController.text.split(',');
+    final ports = <int>{};
+
+    for (final value in values) {
+      final port = int.tryParse(value.trim());
+
+      if (port == null || port < 1 || port > 65535) {
+        throw const FormatException(
+          'Ports invalides. Exemple : 22,80,443,8080',
+        );
+      }
+
+      ports.add(port);
+    }
+
+    if (ports.length > 16) {
+      throw const FormatException(
+        'Limite cette vérification à 16 ports maximum.',
+      );
+    }
+
+    return ports.toList();
+  }
+
+  Future<void> _useLocalSubnet() async {
+    try {
+      final ip = await NetworkInfo().getWifiIP();
+
+      if (!mounted) return;
+
+      if (ip == null || !_isIpv4(ip)) {
+        _notify('IPv4 Wi-Fi non disponible. Saisis la cible manuellement.');
+        return;
+      }
+
+      final prefix = ip.split('.').take(3).join('.');
+
+      setState(() {
+        _targetController.text = '$prefix.0/24';
+      });
+
+      _notify(
+        '/24 proposé à partir de l’IP Wi-Fi : '
+            'ce n’est pas une lecture du masque réel.',
+      );
+    } catch (e) {
+      _notify('Lecture Wi-Fi impossible : $e');
+    }
+  }
+
+  Future<void> _startScan() async {
+    if (_isScanning) return;
+
+    if (!_authorized) {
+      _notify('Confirme d’abord que les cibles sont autorisées.');
+      return;
+    }
+
+    late final List<String> targets;
+    late final List<int> ports;
+
+    try {
+      targets = _parseTargets(_targetController.text);
+      ports = _parsePorts();
+    } on FormatException catch (e) {
+      _notify(e.message.toString());
+      return;
+    }
+
+    if (targets.length > 1) {
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmer le périmètre'),
+          content: Text(
+            'Vérifier ${targets.length} adresses sur '
+                '${ports.length} ports ?\n\n'
+                'Continue uniquement si tout ce sous-réseau '
+                'fait partie de ton périmètre autorisé.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continuer'),
+            ),
+          ],
+        ),
+      );
+
+      if (approved != true || !mounted) return;
     }
 
     setState(() {
       _isScanning = true;
-      _scanProgress = 0.0;
-      _pingResult = "Balayage asynchrone ARP/ICMP en cours...";
-      _pingLatencyMs = null;
-      _connectedDevices.clear();
+      _stopRequested = false;
+      _completed = 0;
+      _total = targets.length;
+      _checkedDevices.clear();
+      _status = 'Vérification TCP en cours...';
     });
 
-    final stopwatch = Stopwatch()..start();
+    try {
+      await _scanner.scan(
+        targets: targets,
+        ports: ports,
+        timeout: Duration(milliseconds: _timeoutMs),
+        onChecked: (device) {
+          if (!mounted) return;
+          setState(() => _checkedDevices.add(device));
+        },
+        onProgress: (completed, total) {
+          if (!mounted) return;
+          setState(() {
+            _completed = completed;
+            _total = total;
+          });
+        },
+      );
 
-    List<NetworkDevice> devices = await _discoveryService.scanSubnet(subnet, onProgress: (progress) {
-      if (mounted) setState(() => _scanProgress = progress);
-    });
+      if (!mounted) return;
 
-    stopwatch.stop();
-
-    if (mounted) {
       setState(() {
-        _isScanning = false;
-        _connectedDevices = devices;
-        _pingLatencyMs = devices.isEmpty ? null : stopwatch.elapsedMilliseconds ~/ devices.length;
-        _pingResult = devices.isEmpty
-            ? "Scan terminé. Aucun appareil détecté sur $subnet.0/24"
-            : "Balayage réussi : ${devices.length} hôtes découverts.";
+        _status = _stopRequested
+            ? 'Arrêt demandé : $_completed/$_total adresses terminées. '
+            '$_reachableCount hôte(s) avec connexion TCP réussie.'
+            : 'Vérification terminée : $_completed adresses, '
+            '$_reachableCount hôte(s) avec connexion TCP réussie. '
+            'Consulte Endpoints.';
       });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _status = 'Erreur de vérification : $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
     }
   }
 
-  void _runToolkitAction(String toolName) async {
-    if (_toolTargetController.text.isEmpty) return;
+  void _stopScan() {
+    _scanner.cancel();
     setState(() {
-      _isToolRunning = true;
-      _toolConsoleOutput = "[SYS] Lancement de $toolName vers ${_toolTargetController.text}...\n";
+      _stopRequested = true;
+      _status =
+      'Arrêt demandé. Attente de la fin des connexions en cours...';
     });
+  }
 
-    await Future.delayed(const Duration(seconds: 2));
+  String _csvCell(Object? value) {
+    final text = value?.toString() ?? '';
+    return '"${text.replaceAll('"', '""')}"';
+  }
+
+  String _buildCsv() {
+    final rows = <String>[
+      'ip,port,connexion_etablie,duree_tcp_ms,statut,date',
+    ];
+
+    for (final device in _checkedDevices) {
+      for (final check in device.checks) {
+        rows.add([
+          device.ip,
+          check.port,
+          check.connected,
+          check.connectionMs,
+          check.status,
+          device.checkedAt.toIso8601String(),
+        ].map(_csvCell).join(','));
+      }
+    }
+
+    return '${rows.join('\r\n')}\r\n';
+  }
+
+  Future<void> _exportCsv() async {
+    if (_checkedDevices.isEmpty) {
+      _notify('Aucun résultat à exporter.');
+      return;
+    }
+
+    final initialPath = [
+      Directory.systemTemp.path,
+      'dark_puls_${DateTime.now().millisecondsSinceEpoch}.csv',
+    ].join(Platform.pathSeparator);
+
+    final controller = TextEditingController(text: initialPath);
+
+    final path = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enregistrer le CSV'),
+        content: SizedBox(
+          width: 600,
+          child: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Chemin complet du fichier',
+              helperText: 'Dossier existant et accessible en écriture.',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(context, controller.text.trim()),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (path == null || path.isEmpty || !mounted) return;
+
+    try {
+      final file = File(path);
+
+      if (await file.exists()) {
+        if (!mounted) return;
+
+        final overwrite = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Fichier existant'),
+            content: const Text('Remplacer ce fichier ?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Remplacer'),
+              ),
+            ],
+          ),
+        );
+
+        if (overwrite != true) return;
+      }
+
+      await file.writeAsString(
+        '\uFEFF${_buildCsv()}',
+        flush: true,
+      );
+
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('CSV enregistré'),
+          content: SelectableText(file.absolute.path),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: file.absolute.path),
+                );
+              },
+              child: const Text('Copier le chemin'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _notify('Échec de l’export : $e');
+    }
+  }
+
+  void _showDetails(NetworkDevice device) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(device.ip),
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Vérifié le : ${device.checkedAt.toLocal()}'),
+                const SizedBox(height: 12),
+                const Text(
+                  'OS, constructeur, MAC et TTL : non mesurés '
+                      'par cette vérification TCP.',
+                ),
+                const Divider(),
+                for (final check in device.checks)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: SelectableText(
+                      'TCP ${check.port} — ${check.status}'
+                          '${check.connectionMs == null ? "" : " "
+                          "(${check.connectionMs} ms)"}',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _validToolTarget(String target) {
+    return target.isNotEmpty &&
+        target.length <= 253 &&
+        !target.startsWith('-') &&
+        RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(target);
+  }
+
+  void _appendOutput(bool route, String value) {
+    if (!mounted) return;
 
     setState(() {
-      _isToolRunning = false;
-      if (toolName == "Traceroute") {
-        _toolConsoleOutput += " 1  192.168.1.1 (Gateway)  1.2ms\n 2  10.10.10.1 (ISP-Router)  12.5ms\n 3  ${_toolTargetController.text} (Target)  24.1ms\n\n[SUCCESS] Route complète.";
-      } else if (toolName == "DNS Lookup") {
-        _toolConsoleOutput += "Server: 8.8.8.8\nAddress: 8.8.8.8#53\n\nNon-authoritative answer:\nName: ${_toolTargetController.text}\nAddress: 142.250.174.142";
-      } else if (toolName == "Speedtest") {
-        _toolConsoleOutput += "Connecting to host ${_toolTargetController.text}, port 5201\n[  5] local 192.168.1.50 port 45212 connected to ${_toolTargetController.text} port 5201\n[ ID] Interval           Transfer     Bitrate\n[  5]   0.00-10.00  sec   115 MBytes  96.5 Mbits/sec                  receiver\n\n[SUCCESS] Test Iperf3 terminé.";
+      final previous = route ? _routeOutput : _console;
+      var updated = '$previous$value';
+
+      // Limite la mémoire utilisée par la console.
+      if (updated.length > 60000) {
+        updated = updated.substring(updated.length - 60000);
+      }
+
+      if (route) {
+        _routeOutput = updated;
+      } else {
+        _console = updated;
       }
     });
   }
 
-  void _exportResults() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Rapport d'audit réseau (CSV) exporté avec succès."), backgroundColor: Color(0xFF00E5FF), behavior: SnackBarBehavior.floating),
+  Future<void> _runTool(String tool, {bool route = false}) async {
+    if (_toolRunning) return;
+
+    if (!_desktop) {
+      _notify('Les outils natifs de cette page nécessitent un desktop.');
+      return;
+    }
+
+    if (!_authorized) {
+      _notify('Confirme que la cible est autorisée dans Découverte.');
+      return;
+    }
+
+    final target = (route
+        ? _routeTargetController.text
+        : _toolTargetController.text)
+        .trim();
+
+    if (!_validToolTarget(target)) {
+      _notify('Saisis une IPv4 ou un nom DNS, sans URL ni options.');
+      return;
+    }
+
+    late final String executable;
+    late final List<String> arguments;
+
+    switch (tool) {
+      case 'Ping':
+        executable = 'ping';
+        arguments = Platform.isWindows
+            ? ['-n', '4', target]
+            : ['-c', '4', target];
+        break;
+
+      case 'DNS':
+        executable = 'nslookup';
+        arguments = [target];
+        break;
+
+      case 'Traceroute':
+        executable = Platform.isWindows ? 'tracert' : 'traceroute';
+        arguments = Platform.isWindows
+            ? ['-d', '-h', '12', '-w', '1000', target]
+            : ['-n', '-m', '12', '-w', '1', target];
+        break;
+
+      case 'iperf3':
+        executable = 'iperf3';
+        arguments = ['-c', target, '-t', '5'];
+        break;
+
+      default:
+        return;
+    }
+
+    setState(() {
+      _toolRunning = true;
+      final header = '\$ $executable ${arguments.join(" ")}\n\n';
+
+      if (route) {
+        _routeOutput = header;
+      } else {
+        _console = header;
+      }
+    });
+
+    Process? process;
+
+    try {
+      process = await Process.start(
+        executable,
+        arguments,
+        runInShell: false,
+      );
+
+      if (!mounted) {
+        process.kill();
+        return;
+      }
+
+      _process = process;
+
+      _processTimer = Timer(const Duration(seconds: 60), () {
+        _appendOutput(route, '\nLimite de 60 secondes atteinte.\n');
+        process?.kill();
+      });
+
+      final outputDone = process.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .forEach((chunk) => _appendOutput(route, chunk));
+
+      final errorDone = process.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .forEach((chunk) => _appendOutput(route, chunk));
+
+      final exitCode = await process.exitCode;
+      await Future.wait([outputDone, errorDone]);
+
+      _appendOutput(route, '\nFin du processus : code $exitCode.\n');
+    } catch (e) {
+      process?.kill();
+      _appendOutput(
+        route,
+        '\nÉchec : $e\n'
+            'Vérifie la présence de l’outil et son accès depuis le PATH.\n',
+      );
+    } finally {
+      _processTimer?.cancel();
+      _processTimer = null;
+      _process = null;
+
+      if (mounted) {
+        setState(() => _toolRunning = false);
+      }
+    }
+  }
+
+  void _stopTool() {
+    final sent = _process?.kill() ?? false;
+    _notify(
+      sent
+          ? 'Demande d’arrêt envoyée au processus.'
+          : 'Aucun processus actif à arrêter pour le moment.',
+    );
+  }
+
+  InputDecoration _decoration(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: kCardColor,
+      border: const OutlineInputBorder(),
+    );
+  }
+
+  Widget _outputBox(String output) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SelectableText(
+        output,
+        style: const TextStyle(
+          color: Colors.greenAccent,
+          fontFamily: 'monospace',
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _scannerTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          'DÉCOUVERTE TCP — CIBLES AUTORISÉES',
+          style: TextStyle(color: kAccentColor),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _targetController,
+          enabled: !_isScanning,
+          decoration: _decoration(
+            'IPv4 ou sous-réseau /24',
+            hint: '10.237.245.171',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _portsController,
+          enabled: !_isScanning,
+          decoration: _decoration('Ports TCP séparés par des virgules'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<int>(
+          value: _timeoutMs,
+          decoration: _decoration('Délai maximal par connexion'),
+          items: const [
+            DropdownMenuItem(value: 1200, child: Text('1,2 seconde')),
+            DropdownMenuItem(value: 2500, child: Text('2,5 secondes')),
+            DropdownMenuItem(value: 5000, child: Text('5 secondes')),
+          ],
+          onChanged: _isScanning
+              ? null
+              : (value) {
+            if (value != null) {
+              setState(() => _timeoutMs = value);
+            }
+          },
+        ),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Je suis autorisé à vérifier les cibles sélectionnées.',
+          ),
+          value: _authorized,
+          onChanged: _isScanning
+              ? null
+              : (value) => setState(() => _authorized = value ?? false),
+        ),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            FilledButton.icon(
+              onPressed: _isScanning ? null : _startScan,
+              icon: const Icon(Icons.search),
+              label: const Text('Vérifier'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _isScanning ? _stopScan : null,
+              icon: const Icon(Icons.stop),
+              label: const Text('Arrêter'),
+            ),
+            TextButton(
+              onPressed: _isScanning ? null : _useLocalSubnet,
+              child: const Text('Proposer le /24 du Wi-Fi'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (_isScanning)
+          LinearProgressIndicator(
+            value: _total == 0 ? null : _completed / _total,
+          ),
+        const SizedBox(height: 12),
+        Text(_status),
+        const SizedBox(height: 8),
+        Text('Adresses terminées : $_completed / $_total'),
+        const SizedBox(height: 20),
+        const Text(
+          'Une connexion TCP réussie confirme un service accessible. '
+              'Aucune connexion réussie ne prouve pas que l’hôte est absent. '
+              'Le temps affiché est une durée TCP, pas un ping ICMP.',
+          style: TextStyle(color: kTextSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _endpointsTab() {
+    final devices = _visibleDevices;
+
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Afficher aussi les cibles sans connexion réussie'),
+          value: _showAll,
+          onChanged: (value) => setState(() => _showAll = value),
+        ),
+        Wrap(
+          spacing: 12,
+          children: [
+            OutlinedButton.icon(
+              onPressed:
+              _isScanning || _checkedDevices.isEmpty ? null : _exportCsv,
+              icon: const Icon(Icons.save_alt),
+              label: const Text('Exporter CSV'),
+            ),
+            TextButton(
+              onPressed: _checkedDevices.isEmpty
+                  ? null
+                  : () async {
+                await Clipboard.setData(
+                  ClipboardData(text: _buildCsv()),
+                );
+                _notify('Résultats CSV copiés.');
+              },
+              child: const Text('Copier CSV'),
+            ),
+          ],
+        ),
+        Expanded(
+          child: devices.isEmpty
+              ? const Center(
+            child: Text('Aucun résultat correspondant au filtre.'),
+          )
+              : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: devices.length,
+            itemBuilder: (context, index) {
+              final device = devices[index];
+              final reachable = device.openPorts.isNotEmpty;
+
+              return Card(
+                color: kCardColor,
+                child: ListTile(
+                  leading: Icon(
+                    reachable ? Icons.computer : Icons.help_outline,
+                    color: reachable
+                        ? Colors.greenAccent
+                        : Colors.orangeAccent,
+                  ),
+                  title: Text(device.ip),
+                  subtitle: Text(
+                    reachable
+                        ? 'Ports : ${device.openPorts.join(", ")}\n'
+                        'Première connexion TCP : '
+                        '${device.connectionMs} ms'
+                        : 'Aucune connexion TCP établie '
+                        'sur les ports testés.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showDetails(device),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _routeTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          'NETPATH — SORTIE RÉELLE DU TRACEROUTE',
+          style: TextStyle(color: kAccentColor),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Aucune route simulée. Les sauts sont affichés '
+              'dans la sortie de l’outil système.',
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _routeTargetController,
+          enabled: !_toolRunning,
+          decoration: _decoration('Cible autorisée'),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          children: [
+            FilledButton(
+              onPressed: _toolRunning
+                  ? null
+                  : () => _runTool('Traceroute', route: true),
+              child: const Text('Tracer la route'),
+            ),
+            OutlinedButton(
+              onPressed: _toolRunning ? _stopTool : null,
+              child: const Text('Arrêter l’outil'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _outputBox(_routeOutput),
+      ],
+    );
+  }
+
+  Widget _toolkitTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        TextField(
+          controller: _toolTargetController,
+          enabled: !_toolRunning,
+          decoration: _decoration('IPv4 ou nom DNS autorisé'),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final name in ['Ping', 'DNS', 'iperf3'])
+              FilledButton(
+                onPressed: _toolRunning ? null : () => _runTool(name),
+                child: Text(name),
+              ),
+            OutlinedButton(
+              onPressed: _toolRunning ? _stopTool : null,
+              child: const Text('Arrêter l’outil'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'iperf3 mesure le débit vers un serveur iperf3 de laboratoire, '
+              'pas automatiquement le débit Internet. '
+              'L’outil doit être installé sur le client et un serveur '
+              'doit être démarré sur la cible.',
+          style: TextStyle(color: kTextSecondary),
+        ),
+        const SizedBox(height: 16),
+        if (_toolRunning) const LinearProgressIndicator(),
+        const SizedBox(height: 12),
+        _outputBox(_console),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: kCardColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: kAccentColor),
-        title: const Text("Scanner Réseau & Outils de Diag", style: TextStyle(color: kTextMain, fontSize: 16, fontWeight: FontWeight.bold)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: kAccentColor,
-          unselectedLabelColor: kTextSecondary,
-          indicatorColor: kAccentColor,
-          isScrollable: true,
-          tabs: const [
-            Tab(icon: Icon(CupertinoIcons.search, size: 18), text: "Découverte"),
-            Tab(icon: Icon(CupertinoIcons.device_laptop, size: 18), text: "Endpoints"),
-            Tab(icon: Icon(CupertinoIcons.map_pin_ellipse, size: 18), text: "NetPath (Carto)"),
-            Tab(icon: Icon(CupertinoIcons.wrench_fill, size: 18), text: "Boîte à outils"),
-          ],
+    final darkTheme = ThemeData.dark();
+
+    return Theme(
+      data: darkTheme.copyWith(
+        scaffoldBackgroundColor: kBackgroundColor,
+        colorScheme: darkTheme.colorScheme.copyWith(
+          primary: kAccentColor,
+          secondary: kAccentColor,
+          surface: kCardColor,
         ),
       ),
-      floatingActionButton: _tabController.index == 1 && _connectedDevices.isNotEmpty
-          ? FloatingActionButton.extended(
-        onPressed: _exportResults,
-        backgroundColor: const Color(0xFF1E3A8A),
-        icon: const Icon(CupertinoIcons.tray_arrow_down, color: Colors.white),
-        label: const Text("Exporter CSV", style: TextStyle(color: Colors.white)),
-      )
-          : null,
-      body: TabBarView(
-        controller: _tabController,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          _buildScannerTab(),
-          _buildEndpointsTab(),
-          _buildNetPathTab(),
-          _buildToolkitTab(),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // ONGLET 1 : DÉCOUVERTE & PORTS
-  // ==========================================
-  Widget _buildScannerTab() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        const Text("CONFIGURATION DU MOTEUR (L3)", style: TextStyle(color: kTextSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _ipController,
-                style: GoogleFonts.jetBrainsMono(color: kTextMain, fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: "Sous-réseau cible",
-                  labelStyle: const TextStyle(color: kTextSecondary, fontSize: 12),
-                  filled: true,
-                  fillColor: kCardColor,
-                  prefixIcon: const Icon(Icons.router, color: kAccentColor, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isScanning ? Colors.orangeAccent : kAccentColor,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: _isScanning ? null : _runNetworkScan,
-              child: _isScanning
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                  : const Icon(CupertinoIcons.search, color: Colors.black),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(_isScanning ? CupertinoIcons.waveform_path : CupertinoIcons.checkmark_shield_fill, color: _isScanning ? Colors.orangeAccent : Colors.greenAccent, size: 18),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(_pingResult, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600))),
-                ],
-              ),
-              if (_isScanning) ...[
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(value: _scanProgress, backgroundColor: Colors.black, color: Colors.orangeAccent, minHeight: 6),
-                ),
+      child: DefaultTabController(
+        length: 4,
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: kCardColor,
+            title: const Text('Dark Puls — Scanner et diagnostic'),
+            bottom: const TabBar(
+              isScrollable: true,
+              tabs: [
+                Tab(icon: Icon(Icons.search), text: 'Découverte'),
+                Tab(icon: Icon(Icons.computer), text: 'Endpoints'),
+                Tab(icon: Icon(Icons.route), text: 'NetPath'),
+                Tab(icon: Icon(Icons.build), text: 'Boîte à outils'),
               ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              _scannerTab(),
+              _endpointsTab(),
+              _routeTab(),
+              _toolkitTab(),
             ],
           ),
         ),
-
-        const SizedBox(height: 32),
-        const Text("VULNÉRABILITÉS PASSERELLE (TCP PORTS)", style: TextStyle(color: kTextSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        const SizedBox(height: 12),
-
-        ..._portsToScan.map((item) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: kCardColor, borderRadius: BorderRadius.circular(12),
-            border: Border(left: BorderSide(color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, width: 4)),
-          ),
-          child: Row(
-            children: [
-              Icon(item["isOpen"] ? CupertinoIcons.lock_open_fill : CupertinoIcons.lock_fill, color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, size: 18),
-              const SizedBox(width: 16),
-              Text("Port ${item['port']}", style: GoogleFonts.jetBrainsMono(color: kTextMain, fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
-              Text("(${item['service']})", style: const TextStyle(color: kTextSecondary, fontSize: 12)),
-              const Spacer(),
-              Text(item["isOpen"] ? "OUVERT" : "FERMÉ", style: TextStyle(color: item["isOpen"] ? Colors.redAccent : Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        )),
-      ],
-    );
-  }
-
-  // ==========================================
-  // ONGLET 2 : ENDPOINTS & GESTION ADMIN
-  // ==========================================
-  Widget _buildEndpointsTab() {
-    if (_connectedDevices.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(CupertinoIcons.wifi_exclamationmark, size: 80, color: Colors.blueGrey[800]),
-            const SizedBox(height: 16),
-            Text("Aucun équipement en mémoire.", style: TextStyle(color: Colors.blueGrey[400], fontSize: 14)),
-            const SizedBox(height: 8),
-            const Text("Lancez une découverte depuis l'onglet Scanner.", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      physics: const BouncingScrollPhysics(),
-      itemCount: _connectedDevices.length,
-      itemBuilder: (context, index) {
-        final device = _connectedDevices[index];
-
-        IconData osIcon = CupertinoIcons.device_laptop;
-        if (device.osType.contains('Linux') || device.osType.contains('Android')) osIcon = CupertinoIcons.device_phone_portrait;
-        if (device.osType.contains('Windows')) osIcon = Icons.window;
-        if (device.osType.contains('Routeur')) osIcon = Icons.router;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: kCardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: kAccentColor.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Icon(osIcon, color: kAccentColor, size: 24),
-            ),
-            title: Text(device.ip, style: GoogleFonts.jetBrainsMono(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(device.osType, style: const TextStyle(color: kTextSecondary, fontSize: 11)),
-                Text("${device.vendor} • ${device.pingMs}ms", style: TextStyle(color: Colors.blueGrey[600], fontSize: 10)),
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              color: kBackgroundColor,
-              icon: const Icon(CupertinoIcons.ellipsis_vertical, color: kTextSecondary),
-              onSelected: (value) {
-                if (value == 'details') {
-                  Navigator.push(context, CupertinoPageRoute(builder: (context) => HostDetailsPage(
-                    ip: device.ip, mac: device.vendor, osType: device.osType, vendor: device.vendor,
-                  )));
-                } else if (value == 'copy') {
-                  Clipboard.setData(ClipboardData(text: device.ip));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("IP copiée dans le presse-papier.")));
-                } else if (value == 'wol') {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Paquet Magic (WoL) envoyé à ${device.vendor}")));
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'details', child: Row(children: [Icon(CupertinoIcons.doc_text_search, size: 16, color: Colors.white), SizedBox(width: 8), Text("Détails de l'Hôte", style: TextStyle(color: Colors.white))])),
-                const PopupMenuItem(value: 'copy', child: Row(children: [Icon(CupertinoIcons.doc_on_clipboard_fill, size: 16, color: Colors.white), SizedBox(width: 8), Text("Copier l'IP", style: TextStyle(color: Colors.white))])),
-                const PopupMenuItem(value: 'wol', child: Row(children: [Icon(CupertinoIcons.bolt_fill, size: 16, color: Colors.yellowAccent), SizedBox(width: 8), Text("Wake-on-LAN", style: TextStyle(color: Colors.white))])),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ==========================================
-  // ONGLET 3 : NETPATH CARTOGRAPHIE
-  // ==========================================
-  Widget _buildNetPathTab() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("VISUALISATION DE LA ROUTE (NETPATH)", style: TextStyle(color: kTextSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 16),
-          const Text("Identifiez les goulots d'étranglement (Bottlenecks) de bout en bout.", style: TextStyle(color: Colors.blueGrey, fontSize: 12)),
-          const SizedBox(height: 32),
-
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
-                  _buildPathNode("Localhost", "192.168.1.45", CupertinoIcons.device_laptop, Colors.greenAccent),
-                  _buildPathLink("1.2 ms"),
-                  _buildPathNode("Gateway", "192.168.1.1", CupertinoIcons.rocket_fill, kAccentColor),
-                  _buildPathLink("12.5 ms"),
-                  _buildPathNode("ISP Edge", "10.10.10.1", Icons.dns, Colors.orangeAccent),
-                  _buildPathLink("145.0 ms", isSlow: true), // Simulation d'un lien lent
-                  _buildPathNode("Target", "8.8.8.8", CupertinoIcons.cloud_fill, Colors.greenAccent),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
-    );
-  }
-
-  Widget _buildPathNode(String label, String ip, IconData icon, Color color) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle, border: Border.all(color: color.withValues(alpha: 0.5))), child: Icon(icon, color: color, size: 36)),
-        const SizedBox(height: 16),
-        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 4),
-        Text(ip, style: GoogleFonts.jetBrainsMono(color: Colors.blueGrey[400], fontSize: 10)),
-      ],
-    );
-  }
-
-  Widget _buildPathLink(String latency, {bool isSlow = false}) {
-    Color linkColor = isSlow ? Colors.redAccent : Colors.greenAccent;
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(latency, style: GoogleFonts.jetBrainsMono(color: linkColor, fontSize: 11, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Container(height: 2, width: double.infinity, color: linkColor.withValues(alpha: 0.5)),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================
-  // ONGLET 4 : BOÎTE À OUTILS
-  // ==========================================
-  Widget _buildToolkitTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("OUTILS D'ADMINISTRATION L4/L7", style: TextStyle(color: kTextSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(color: kCardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
-                      child: TextField(
-                        controller: _toolTargetController,
-                        style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 13),
-                        decoration: const InputDecoration(hintText: "IP Cible ou Domaine (ex: google.com)", hintStyle: TextStyle(color: Colors.white30), border: InputBorder.none),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildToolBtn("Traceroute", CupertinoIcons.arrow_branch, Colors.orangeAccent)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildToolBtn("Speedtest", CupertinoIcons.speedometer, Colors.purpleAccent)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildToolBtn("DNS Lookup", CupertinoIcons.search, kAccentColor)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: const Color(0xFF000000), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Sortie Console (stdout)", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold)),
-                const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: Colors.white12, height: 1)),
-                if (_isToolRunning) const Padding(padding: EdgeInsets.only(bottom: 12), child: LinearProgressIndicator(color: kAccentColor, backgroundColor: Colors.black)),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Text(_toolConsoleOutput, style: GoogleFonts.jetBrainsMono(color: Colors.greenAccent, fontSize: 12, height: 1.5)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        )
-      ],
-    );
-  }
-
-  Widget _buildToolBtn(String label, IconData icon, Color color) {
-    return ElevatedButton.icon(
-      style: ElevatedButton.styleFrom(backgroundColor: color.withValues(alpha: 0.1), foregroundColor: color, side: BorderSide(color: color.withValues(alpha: 0.3)), padding: const EdgeInsets.symmetric(vertical: 12), elevation: 0),
-      icon: Icon(icon, size: 14),
-      label: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-      onPressed: _isToolRunning ? null : () => _runToolkitAction(label),
     );
   }
 }
